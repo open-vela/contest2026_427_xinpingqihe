@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-15 13:43:04",
- "generated_at_epoch": 1789450984,
+ "generated_at": "2026-09-15 19:55:30",
+ "generated_at_epoch": 1789473330,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 172,
   "critical": 96,
-  "bytes": 8363644,
+  "bytes": 8379069,
   "missing_in_workspace": 0
  },
  "files": [
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "79386466185409ad3249621ae6c74ecb",
-   "size": 45576,
+   "md5": "9d5cef1dd203678565f8c053f4f81ff1",
+   "size": 47354,
    "present": true
   },
   {
@@ -128,7 +128,7 @@
    "dst": "apps/examples/phywear/phywear_i18n_tables.inc",
    "compare": "exact",
    "critical": true,
-   "md5": "5867bac08295670e2374ab3526ebcbb5",
+   "md5": "4fc27c106d04f05c93c29327e501cd1b",
    "size": 30018,
    "present": true
   },
@@ -205,8 +205,8 @@
    "dst": "apps/examples/phywear/phywear_raw.c",
    "compare": "exact",
    "critical": true,
-   "md5": "6ab18520281418e08c9e820fff4fca81",
-   "size": 32042,
+   "md5": "36b371667fad382b3e7588de4c4a3230",
+   "size": 45228,
    "present": true
   },
   {
@@ -216,8 +216,8 @@
    "dst": "apps/examples/phywear/phywear_raw.h",
    "compare": "exact",
    "critical": true,
-   "md5": "b18cf1f9c6681d7f4fe1c26d74aca104",
-   "size": 1543,
+   "md5": "ed1e95219846fa0d241430a1a455419b",
+   "size": 1887,
    "present": true
   },
   {
@@ -502,8 +502,8 @@
    "dst": "apps/examples/phywear/pw_scope.c",
    "compare": "exact",
    "critical": true,
-   "md5": "a9d77c0741eb69d3b08b3718fc2c43f8",
-   "size": 12311,
+   "md5": "c9d872c4a25ac53ff5792dc192a3229e",
+   "size": 12337,
    "present": true
   },
   {
@@ -513,8 +513,8 @@
    "dst": "apps/examples/phywear/pw_scope.h",
    "compare": "exact",
    "critical": true,
-   "md5": "9c797655639a63069f8386d27d6b02b6",
-   "size": 3019,
+   "md5": "46b6ebcb18b33cbd9388b574efb04baa",
+   "size": 3110,
    "present": true
   },
   {

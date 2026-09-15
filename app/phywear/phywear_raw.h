@@ -23,14 +23,24 @@
 #ifndef __APPS_EXAMPLES_PHYWEAR_RAW_H
 #define __APPS_EXAMPLES_PHYWEAR_RAW_H
 
-/* 原始传感器板块（phyphox Raw Sensors 对齐）：4 页横滑大数值实时页。
- *   Accelerometer (g) / Gyroscope (dps) / Magnetometer (mG) / Light (lux)
- * 屏幕对象构建好后由 pw_scr_open() 压栈显示；返回箭头弹回上一屏。 */
+/* 原始传感器板块（phyphox Raw Sensors 对齐）：6 页横滑。
+ *   Accelerometer (g) / Gyroscope (dps) / Magnetometer (mG) / Light (lux) /
+ *   Microphone (dBFS) / Speaker
+ * 三个三轴页有两种视图：数值（默认，3 行大数字）与图线（一行三列 + 三泳道曲线），
+ * 轻点页面或右下角图标切换。屏幕对象构建好后由 pw_scr_open() 压栈显示。 */
 
 lv_obj_t *pw_raw_screen(void);
 
 /* 跳到指定子页（0..5）：截图与 AI 切页用 */
 
 void pw_raw_goto(int idx);
+
+/* 三轴页视图 */
+#define PW_RAW_VIEW_NUM    0
+#define PW_RAW_VIEW_CURVE  1
+
+/* 切换三轴页视图（无头截图/调试用；屏幕未打开时忽略） */
+
+void pw_raw_set_view(int view);
 
 #endif /* __APPS_EXAMPLES_PHYWEAR_RAW_H */

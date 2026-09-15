@@ -475,7 +475,7 @@ void pw_scope_axes(lv_obj_t *scope, lv_color_t color)
 }
 
 void pw_scope_set_lanes_i16(lv_obj_t *scope, FAR const int16_t *hist,
-                            int nser, int n, float inv,
+                            int nser, int n, FAR const float *inv,
                             FAR const lv_color_t *colors)
 {
   struct pw_scope_s *s = scope_find(scope);
@@ -485,15 +485,10 @@ void pw_scope_set_lanes_i16(lv_obj_t *scope, FAR const int16_t *hist,
   int i;
   int k;
 
-  if (s == NULL || hist == NULL || colors == NULL ||
+  if (s == NULL || hist == NULL || colors == NULL || inv == NULL ||
       nser <= 0 || nser > 8 || n < 2)
     {
       return;
-    }
-
-  if (inv <= 0.0f)
-    {
-      inv = 1.0f;
     }
 
   px = (uint32_t)s->w * (uint32_t)s->h;
@@ -525,9 +520,11 @@ void pw_scope_set_lanes_i16(lv_obj_t *scope, FAR const int16_t *hist,
             }
         }
 
+      float iv = (inv[i] > 0.0f) ? inv[i] : 1.0f;
+
       for (k = 0; k < n; k++)
         {
-          float v = (float)row[k] * inv;
+          float v = (float)row[k] * iv;
           /* 横向量程留出外框两列（1..w-2），否则最新样本会被外框盖掉 */
           int xi = 1 + k * (s->w - 3) / (n - 1);
           int yi;

@@ -51,6 +51,7 @@
 
 #include <lvgl/lvgl.h>
 
+#include <nuttx/input/touchscreen.h>
 #include <nuttx/sensors/lsm6dsl.h>
 #include <nuttx/sensors/mmc5603.h>
 
@@ -574,6 +575,8 @@ int pw_cap_open(const char *name)
   else if (strcmp(name, "spk")       == 0) { scr = pw_raw_screen(); pw_raw_goto(5); }
   else if (strcmp(name, "gyro")      == 0) { scr = pw_raw_screen(); pw_raw_goto(1); }
   else if (strcmp(name, "mag")       == 0) { scr = pw_raw_screen(); pw_raw_goto(2); }
+  else if (strcmp(name, "rawcurve")  == 0) { scr = pw_raw_screen();
+                                             pw_raw_set_view(PW_RAW_VIEW_CURVE); }
   else if (strcmp(name, "about")     == 0) scr = pw_about_screen();
   else if (strcmp(name, "ai")        == 0) scr = pw_ai_coach_screen();
   else return 0;
@@ -1048,6 +1051,51 @@ int main(int argc, FAR char *argv[])
     }
 
   /* 子命令：phywear micread [n] → 连续读麦克风并打印峰值/有效值（自检） */
+
+  /* 模拟器专用触摸注入：phywear tap <x> <y>
+   *
+   * 模拟器没有真实触摸（goldfish 的 utouch 是 UInput 注入设备），无头验证"点击
+   * 切换视图"这类交互时，主机侧没法点屏幕。这里往 /dev/utouch 写一个
+   * touch_sample_s：先 DOWN、隔 ~150ms 再 UP，保证 LVGL 的 indev 轮询能分别看到
+   * 按下与抬起，从而产生一次真正的 CLICKED（一次同时带 DOWN|UP 的样本不可靠）。
+   * 真机不开 UINPUT_TOUCH，所以这段只在模拟器编进去；真机点击靠手指验证。 */
+
+#ifdef CONFIG_UINPUT_TOUCH
+  if (argc > 3 && strcmp(argv[1], "tap") == 0)
+    {
+      struct touch_sample_s smp;
+      int fd;
+      int x = atoi(argv[2]);
+      int y = atoi(argv[3]);
+      int pass;
+
+      fd = open("/dev/utouch", O_WRONLY);
+      if (fd < 0)
+        {
+          printf("tap: open /dev/utouch failed: %d\n", errno);
+          return EXIT_FAILURE;
+        }
+
+      for (pass = 0; pass < 2; pass++)
+        {
+          memset(&smp, 0, sizeof(smp));
+          smp.npoints = 1;
+          smp.point[0].id = 0;
+          smp.point[0].x = (int16_t)x;
+          smp.point[0].y = (int16_t)y;
+          smp.point[0].h = 1;
+          smp.point[0].w = 1;
+          smp.point[0].flags = TOUCH_ID_VALID | TOUCH_POS_VALID |
+                               (pass == 0 ? TOUCH_DOWN : TOUCH_UP);
+          (void)write(fd, &smp, SIZEOF_TOUCH_SAMPLE_S(1));
+          usleep(pass == 0 ? 150000 : 20000);
+        }
+
+      close(fd);
+      printf("tap: (%d,%d) injected\n", x, y);
+      return EXIT_SUCCESS;
+    }
+#endif
 
   if (argc > 1 && strcmp(argv[1], "micread") == 0)
     {
