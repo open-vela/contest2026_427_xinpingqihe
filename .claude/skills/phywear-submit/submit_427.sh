@@ -128,6 +128,9 @@ if git diff --cached -U0 | grep -Eq '(tp-[a-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|ghp_[
 fi
 # 5.2 禁止路径 + 二进制白名单
 ALLOW_BIN='^board/ftab_openvela.bin$'
+# 只检查**新增/修改/重命名**（--diff-filter=ACMR）：删除违规文件（如历史误入库的 .zip）
+# 是合规动作，必须放行 —— 否则永远无法把违规产物从库里清掉。
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   case "$f" in
