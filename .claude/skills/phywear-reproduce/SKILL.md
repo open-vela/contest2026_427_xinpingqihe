@@ -125,7 +125,7 @@ rm -f cmake_out/sf32lb52_lchspi_ulp_nsh_ai/.config
 cmake -B cmake_out/sf32lb52_lchspi_ulp_nsh_ai -S nuttx -GNinja \
   -DBOARD_CONFIG=../vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai \
   -DEXTRA_FLAGS="-Wno-cpp -Wno-deprecated-declarations"
-cmake --build cmake_out/sf32lb52_lchspi_ulp_nsh_ai -j16     # 产物 nuttx.bin ≈ 2.02 MB
+cmake --build cmake_out/sf32lb52_lchspi_ulp_nsh_ai -j16     # 产物 nuttx.bin ≈ 2.08 MB（SRAM ≈ 93.9%）
 
 ./flash_with_ftab.sh cmake_out/sf32lb52_lchspi_ulp_nsh_ai/nuttx.bin /dev/ttyUSB0
 ```
@@ -172,7 +172,7 @@ bash ~/work/contest2026_427_xinpingqihe/.claude/skills/phywear-reproduce/install
 
 - 模拟器 IMU 是**合成波形**，只能演示链路，**不得当测量证据**；模拟器 ≈22–23 FPS ≠ 真机 ≈41 FPS。
 - **EPIC 硬件加速来自官方 PR #31 / #41 / #121，非本队原创**；phyphox 是灵感来源，代码是独立 C 重写。
-- **主动场景默认关闭**（`PW_WATCH_PROACTIVE 0`），只记录事件日志，不能说成"默认开启"。
+- **主动场景已交付且默认开启**（`PW_WATCH_PROACTIVE 1`）：晃表 → Agent 自动开单摆实验 → 结果进手表 AI 日志，真机已验证；推送必须走受保护的 `pw_ai_ask()`（Agent 不在时干净拒绝，不会 panic）。注意：单摆页在静止/振动桌面上仍可能给出无效 g，只说「三道有效性门 + 有残余漏过」，不要宣称任何情况都准。
 - 扬声器响度受**板载喇叭物理上限**限制（PA 开关/音量拉到 100% 只差 1–3 dB）。
 - 真机**没有网络栈**，LLM 端云演示只在模拟器上做；真机走离线关键词意图直通。
 - 90 Hz 测到 180 Hz 是弱低频 + 同板声耦合导致的二次谐波，不是坐标轴刻度错误。

@@ -20,7 +20,7 @@ description: 把 PhyWear（openvela 黄山派手表物理实验室）的开发�
 | R5 | **真机串口铁律**：`pyserial` 打开后立刻 `dtr=False; rts=False`；`picocom` 必须 `--noreset --lower-rts --lower-dtr`；`/dev/ttyUSB0` **独占**；**禁止 `erase_flash`**；一个 boot 只跑一个 `phywear` GUI |
 | R6 | **改完必须回仓**：工作区（`~/openvela`）里的改动要 rsync 回参赛仓，并重生成清单 `gen_manifest.py --write`，否则换电脑就丢 |
 | R7 | **会员身份**：EPIC 硬件加速来自官方 PR #31/#41/#121，**非本队原创**；phyphox 是灵感来源，代码为独立 C 重写（见 `app/phywear/NOTICE.md`） |
-| R8 | **如实口径**：主动场景默认关闭（`PW_WATCH_PROACTIVE 0`）；真机无网络栈、LLM 只在模拟器演示；板载喇叭响度是硬件上限 |
+| R8 | **如实口径**：主动场景**已交付且默认开启**（`PW_WATCH_PROACTIVE 1`，推送走受保护的 `pw_ai_ask()`）；`ai_agent` 已开机自启；真机无网络栈、LLM 只在模拟器演示；板载喇叭响度是硬件上限 |
 | R9 | **每次会话结束必须导出 AI 日志**：跑 `.claude/skills/phywear-migrate/finish_session.sh`（见 §6），否则该时段不计工时 |
 | R10a | **提交只能走 `phywear-submit/submit_427.sh`**：不许手敲 `git push`、不许 force-push 官方仓、推送后必须同步 fork 默认分支并核对远端 SHA（见 `.claude/skills/phywear-submit/SKILL.md` 的 S1–S13） |
 | R10 | **只做被要求的范围**：不擅自改官方包（`packages/ai_agent` 等）之外的架构，改动集中、可回滚 |

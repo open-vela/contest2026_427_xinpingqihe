@@ -96,8 +96,10 @@ cmake --build cmake_out/vela_goldfish-arm64-v8a-ap-phywear -j16
    链接进工作区，**不含** `src/**` 的公共仓改动 —— 所以仍要跑第 ② 步的恢复脚本（它已覆盖全部 169 个文件）。
 3. **真机没有网络栈**：真机上 LLM 对话不可用，走端侧离线意图 + 工具；**端云 LLM 对话在模拟器演示**
    （小米 MiMo Token Plan；实测记录见 `docs/evidence/llm-20260913/`）。
-4. **"主动+执行"场景默认关闭**（`PW_WATCH_PROACTIVE 0`）：代码保留、只记录事件日志，原因与后续方向见
-   `docs/05_AI_Agent与Skill.md` §5。
+4. **"主动+执行"场景已交付并默认开启**（`PW_WATCH_PROACTIVE 1`，2026-09-15）：晃表 → Agent 自动开单摆实验 →
+   结果进手表 AI 日志，真机已验证（`docs/evidence/proactive-20260915/`）；两个真崩溃已修（`velaclaw_ask` 断言、
+   cJSON 双重释放），`ai_agent` 已开机自启。**残余**：静止/振动桌面下单摆页仍可能给出无效 g（三道有效性门
+   有漏过，约 1 条/70 s），根治需改页面运动判据 —— 详见 `docs/03 §7`。
 5. **EPIC 硬件加速来自官方 PR**（vendor_sifli #31 / lvgl #41 / nuttx-apps #121），**非本队原创**；
    本队做的是集成 + UI/算法层优化 + 驱动/应用。
 6. **模拟器数据是合成的**；模拟器帧率（22–23）与真机（约 41）不可混用。

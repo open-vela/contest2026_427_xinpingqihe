@@ -144,17 +144,31 @@ PhyWear 在 GUI 循环里以 10 Hz 读 IMU 合模长，滑动窗口 4 s：
 |---|---|
 | 判定 | 窗口峰峰值 ≥ **250 mg** 且持续 ≥ **2.5 s** |
 | 冷却 | 触发后 **60 s** 内不再触发 |
-| 动作（原） | 把事件文本推给 Agent → Agent 调 `phywear_run_experiment` 打开单摆页采样 10 s 并回报 |
+| 动作（现状） | 把事件文本推给 Agent → Agent 调 `phywear_run_experiment` 打开单摆页 → **等页面自己算完并登记结果** → 读回上报（Agent 不碰传感器） |
 
-### 5.2 为什么**默认关闭**（2026-09-13 真机实测）
+### 5.2 曾经默认关闭 → 2026-09-15 定位真因并重新开启
 
-- 现象：启动 `phywear` 后十几秒整机卡死，日志停在摆动巡检那一行。
-- 根因：事件推给 Agent 后，Agent 侧 `phywear_run_experiment` 在 **agent 任务**里长时间读传感器**并**请求 GUI 切到单摆页 —— 两条线程抢同一颗 IMU、同时切页；
-  且 NuttX 的 fd 按任务隔离，Agent 任务用不了 PhyWear 打开的传感器 fd，采样恒为 `samples:0`。
-- 处置：新增开关 `PW_WATCH_PROACTIVE`，**默认 0** —— 摆动检测保留（只打日志 `proactive push disabled: event only logged`），不再联系 Agent、不再自动切页。
-- 验证：150 s 泡机，心跳连续（`[phywear] alive t=…s fps=…`），期间摆动事件触发 2 次均只记日志、界面不卡。
+**（09-13 的临时规避）** 现象：启动 `phywear` 后十几秒整机卡死，日志停在摆动巡检那一行。
+当时的判断是「Agent 任务长时间读传感器 + 请求 GUI 切页 → 抢 IMU/抢切页」，于是新增开关
+`PW_WATCH_PROACTIVE` 并**默认置 0**（只打日志），150 s 泡机验证不卡。
 
-### 5.3 后续方向（与用户确认过，暂搁置）
+**（09-15 查到底）** 真因有三层，前两层才是卡死/崩溃的根源：
+
+1. **Agent 侧重复采样**：`phywear_run_experiment` 在 agent 任务里又按 **50 Hz 采了一遍 IMU**，
+   而屏幕上的实验页同时也在 50 Hz 采同一颗传感器（oneshot 每样本还 open/close 一次）→ 两路抢同一条 I2C。
+   现在改成「开页 → **等页面把结果登记出来** → 读结果」，Agent 侧**不再采样**。
+2. **Agent 不在时直接 panic**：`velaclaw_client_open()` 在总线未初始化时也会成功，随后
+   `velaclaw_ask → msg_queue_push → pthread_mutex_take` 撞 `DEBUGASSERT(NXSEM_IS_MUTEX)`，
+   把调用方（GUI）整个带崩 —— 这条连「AI 教练页按钮」也会踩。现在客户端会先探测总线，
+   干净返回 NULL；推送统一走受保护的 `pw_ai_ask()`。
+3. **工具里 cJSON 双重释放**：`pw_tool_emit()` 内部已 `cJSON_Delete(root)`，新分支又删一次 → ASAN 报错。已修。
+
+**现状**：`PW_WATCH_PROACTIVE 1`（默认开启），`ai_agent` 由板级 `etc/init.d/rc.sysinit` 开机自启；
+真机全链路已验证（`docs/evidence/proactive-20260915/`）。
+**残余风险**：静止/振动桌面下单摆页仍可能给出无效 g —— 我们加了「独立数据 + 可复现 + 合理性(5~15 m/s²)」
+三道有效性门，实测把垃圾上报从 ~3 条/秒压到 70 s 内 1 条，**但仍有漏过**；根治要改单摆页的运动判据与周期估计。
+
+### 5.3 后续方向（与用户确认过，暂搁置；主动场景本身已完成）
 
 原则：**主动能力要有，但不与传感器/界面线程抢资源**。
 
