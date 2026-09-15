@@ -965,7 +965,13 @@ int pw_calib_selftest(float *err_out)
     for (k = 0; k < 3; k++)
       {
         float eb = fabsf(bias[k] - bias_true[k]);
-        float es = fabsf(scale[k] - gain_true[k]) / gain_true[k];
+
+        /* 口径注意：本库的 scale 是**修正系数**（真值 = (实测-bias)·scale），
+         * 应等于 1/gain，而不是 gain 本身。早期这里误与 gain 比较，于是
+         * worst_rel_err 里恒含约 6% 的"口径差"；2026-09-15 用 imubench 把注入
+         * 真值与 UI 解算对照时才看出来，遂改正。 */
+
+        float es = fabsf(scale[k] - 1.0f / gain_true[k]) * gain_true[k];
 
         if (eb > worst) worst = eb;
         if (es > worst) worst = es;

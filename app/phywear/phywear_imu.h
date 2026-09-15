@@ -24,4 +24,11 @@ lv_obj_t *pw_imu_screen(void);
 
 void pw_imu_goto(int idx);
 
+/* bench：注入**合成**数据并自动走完标定流程（性能/演示/自动化验证用；不是测量）。
+ * 注入的真值：加速度零偏 (0.020,-0.015,0.030) g、刻度 (1.02,0.98,1.01)、
+ *            陀螺零偏 (0.010,-0.008,0.012) rad/s、磁硬铁中心 (35,-120,60) mG。
+ * 画面标题会带 [BENCH] 标记，避免把注入数据当测量。 */
+
+void pw_imu_bench(int on);
+
 #endif /* __APPS_EXAMPLES_PHYWEAR_IMU_H */

@@ -550,6 +550,9 @@ static int phywear_centripetal(int argc, FAR char *argv[])
  * Private Functions
  ****************************************************************************/
 
+/* imubench 起始页（pw_cap_open 与 main 都要用） */
+static int g_imu_bench_page = 2;
+
 /* 截图专用：按名字打开指定屏。root 走 pw_ui_root()（它自己 open），
  * 其余返回待打开的 screen 对象。返回 1 表示名字有效。
  * 真机不带 cap 子命令时这段代码不会被执行，保留不影响固件行为。 */
@@ -581,6 +584,9 @@ int pw_cap_open(const char *name)
   else if (strcmp(name, "rawcurve")  == 0) { scr = pw_raw_screen();
                                              pw_raw_set_view(PW_RAW_VIEW_CURVE); }
   else if (strcmp(name, "imu")       == 0) scr = pw_imu_screen();
+  else if (strcmp(name, "imubench")  == 0) { pw_imu_bench(1);
+                                             scr = pw_imu_screen();
+                                             pw_imu_goto(g_imu_bench_page); }
   else if (strcmp(name, "imubias")   == 0) { scr = pw_imu_screen(); pw_imu_goto(1); }
   else if (strcmp(name, "imu6")      == 0) { scr = pw_imu_screen(); pw_imu_goto(2); }
   else if (strcmp(name, "imumag")    == 0) { scr = pw_imu_screen(); pw_imu_goto(3); }
@@ -704,6 +710,7 @@ int main(int argc, FAR char *argv[])
   bool ruler_bench_mode = false;
   bool time_bench_mode = false;
   bool life_bench_mode = false;
+
   int  time_bench_kind = 0;   /* 0=motion 1=light 2=acoustic */
   bool open_raw = false;      /* 调试：直接打开 Raw Sensors 页 */
   bool demo_mode = false;     /* 自动演示：模拟点击验证 / 录屏 */
@@ -1058,6 +1065,16 @@ int main(int argc, FAR char *argv[])
     }
 
   /* 子命令：phywear micread [n] → 连续读麦克风并打印峰值/有效值（自检） */
+
+  /* 子命令：phywear imubench [页] —— 标定 UI 的**注入**演示/自测：
+   *   注入已知零偏/刻度/硬铁中心，并自动走完标定流程（不需要人手、不需要触摸）。
+   *   画面标题带 [BENCH]，避免把注入数据当测量。页：0 实时 1 零偏 2 六面 3 磁。 */
+
+  if (argc > 1 && strcmp(argv[1], "imubench") == 0)
+    {
+      g_imu_bench_page = (argc > 2) ? atoi(argv[2]) : 2;
+      cap_screen = "imubench";        /* 具体开屏与注入在 pw_cap_open 分支里做 */
+    }
 
   /* 子命令：phywear ahrs [秒] —— 姿态解算。
    *   不带参数：只跑合成数据自检（主机/模拟器/真机都能跑，判断实现是否退化）。

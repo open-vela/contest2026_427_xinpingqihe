@@ -110,6 +110,25 @@ struct imu_ui_s
 
 static struct imu_ui_s g_i;
 
+/* ---- bench（注入合成数据）----
+ * 真值固定，便于"标定能不能还原"这件事可验证：
+ *   加速度零偏 BIAS_A g、刻度 SCALE_A；陀螺零偏 BIAS_G rad/s；磁硬铁中心 CENTER_M mG。
+ * 不是测量：屏幕上会显示 [BENCH] 标记。 */
+
+static int  g_imu_bench;
+static long g_imu_bench_n;
+
+static const float BENCH_BA[3] = {0.020f, -0.015f, 0.030f};
+static const float BENCH_SA[3] = {1.02f, 0.98f, 1.01f};
+static const float BENCH_BG[3] = {0.010f, -0.008f, 0.012f};
+static const float BENCH_CM[3] = {35.0f, -120.0f, 60.0f};
+
+void pw_imu_bench(int on)
+{
+  g_imu_bench = on ? 1 : 0;
+  g_imu_bench_n = 0;
+}
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -117,6 +136,55 @@ static struct imu_ui_s g_i;
 static int imu_dps1000(float rps)
 {
   return (int)(rps * 57.29578f * 1000.0f);
+}
+
+/* 合成一拍数据：dir 为"重力朝下的机体轴"(0..5，对应六面)，-1 表示平放 */
+static void imu_bench_data(float *a, float *g, float *m, int dir)
+{
+  float u[3] = {0.0f, 0.0f, 1.0f};
+  float ph;
+  float ux;
+  float uy;
+  float uz;
+  float n;
+  int   k;
+
+  if (dir >= 0 && dir < 6)
+    {
+      k = dir / 2;
+      u[0] = u[1] = u[2] = 0.0f;
+      u[k] = ((dir % 2) == 0) ? 1.0f : -1.0f;
+    }
+
+  a[0] = u[0] * BENCH_SA[0] + BENCH_BA[0];
+  a[1] = u[1] * BENCH_SA[1] + BENCH_BA[1];
+  a[2] = u[2] * BENCH_SA[2] + BENCH_BA[2];
+
+  g[0] = BENCH_BG[0];
+  g[1] = BENCH_BG[1];
+  g[2] = BENCH_BG[2];
+
+  /* 磁：让方向绕两轴转，覆盖球面（椭球拟合需要立体角覆盖） */
+
+  ph = (float)g_imu_bench_n * 0.05f;
+  ux = sinf(ph);
+  uy = sinf(ph * 0.7f + 1.0f);
+  uz = cosf(ph);
+  n = sqrtf(ux * ux + uy * uy + uz * uz);
+  if (n < 1e-6f)
+    {
+      n = 1.0f;
+    }
+
+  ux /= n;
+  uy /= n;
+  uz /= n;
+
+  m[0] = 520.0f * ux + BENCH_CM[0];
+  m[1] = 520.0f * uy + BENCH_CM[1];
+  m[2] = 520.0f * uz + BENCH_CM[2];
+
+  g_imu_bench_n++;
 }
 
 static void imu_sync_dots(void)
@@ -416,25 +484,36 @@ static void imu_tick_cb(lv_timer_t *timer)
       dt = (float)IMU_TICK_MS / 1000.0f;
     }
 
-  if (pw_sensors_read_imu(&imu) < 0)
+  if (g_imu_bench)
     {
-      return;
-    }
+      /* 注入：六面页按"当前要取的那一面"给朝向，其余页平放 */
 
-  a[0] = imu.ax / 1000.0f;
-  a[1] = imu.ay / 1000.0f;
-  a[2] = imu.az / 1000.0f;
-  g[0] = imu.gx * 1.745329e-5f;
-  g[1] = imu.gy * 1.745329e-5f;
-  g[2] = imu.gz * 1.745329e-5f;
-
-  have_mag = (pw_sensors_read_mag(&mag) == 0);
-  if (have_mag)
-    {
-      m[0] = (float)mag.x;
-      m[1] = (float)mag.y;
-      m[2] = (float)mag.z;
+      imu_bench_data(a, g, m, (g_i.idx == 2) ? g_i.six_face : -1);
+      have_mag = 1;
       g_i.mag_seen = 1;
+    }
+  else
+    {
+      if (pw_sensors_read_imu(&imu) < 0)
+        {
+          return;
+        }
+
+      a[0] = imu.ax / 1000.0f;
+      a[1] = imu.ay / 1000.0f;
+      a[2] = imu.az / 1000.0f;
+      g[0] = imu.gx * 1.745329e-5f;
+      g[1] = imu.gy * 1.745329e-5f;
+      g[2] = imu.gz * 1.745329e-5f;
+
+      have_mag = (pw_sensors_read_mag(&mag) == 0);
+      if (have_mag)
+        {
+          m[0] = (float)mag.x;
+          m[1] = (float)mag.y;
+          m[2] = (float)mag.z;
+          g_i.mag_seen = 1;
+        }
     }
 
   switch (g_i.idx)
@@ -451,26 +530,47 @@ static void imu_tick_cb(lv_timer_t *timer)
         break;
 
       case 1:
+        if (g_imu_bench && !g_i.bias_rec && g_i.bias_acc.n == 0)
+          {
+            imu_bias_cb(NULL);            /* bench：自动开始 */
+          }
+
         if (g_i.bias_rec)
           {
             pw_calib_bias_add(&g_i.bias_acc, g);
             lv_label_set_text_fmt(g_i.bias_prog, PW_STR(IMU_FMT_SAMPLES),
                                   g_i.bias_acc.n);
+
+            if (g_imu_bench && g_i.bias_acc.n >= 150)
+              {
+                imu_bias_cb(NULL);        /* bench：自动停 + 求解 */
+              }
           }
         break;
 
       case 2:
-        if (g_i.six_face < 6 &&
-            g_i.six_acc.n[g_i.six_face] < SIX_FACE_N)
+        if (g_i.six_face < 6)
           {
-            pw_calib_six_add(&g_i.six_acc, g_i.six_face, a);
-            lv_label_set_text_fmt(g_i.grav_prog, PW_STR(IMU_FMT_FACE),
-                                  g_i.six_face + 1,
-                                  g_i.six_acc.n[g_i.six_face]);
+            if (g_i.six_acc.n[g_i.six_face] < SIX_FACE_N)
+              {
+                pw_calib_six_add(&g_i.six_acc, g_i.six_face, a);
+                lv_label_set_text_fmt(g_i.grav_prog, PW_STR(IMU_FMT_FACE),
+                                      g_i.six_face + 1,
+                                      g_i.six_acc.n[g_i.six_face]);
+              }
+            else if (g_imu_bench)
+              {
+                imu_grav_cb(NULL);        /* bench：自动翻到下一面 / 求解 */
+              }
           }
         break;
 
       case 3:
+        if (g_imu_bench && !g_i.mag_rec && g_i.mag_acc.n == 0)
+          {
+            imu_mag_cb(NULL);             /* bench：自动开始 */
+          }
+
         if (g_i.mag_rec && have_mag)
           {
             float mean;
@@ -482,6 +582,11 @@ static void imu_tick_cb(lv_timer_t *timer)
                                   g_i.mag_acc.n);
             lv_label_set_text_fmt(g_i.mag_res[1], PW_STR(IMU_FMT_MAGMEAN),
                                   (int)mean);
+
+            if (g_imu_bench && g_i.mag_acc.n >= 400)
+              {
+                imu_mag_cb(NULL);         /* bench：自动停 + 拟合 */
+              }
           }
         break;
 
@@ -696,7 +801,21 @@ lv_obj_t *pw_imu_screen(void)
 
   g_i.scr = pw_scr_new();
 
-  g_i.scroller = pw_topbar(g_i.scr, PW_STR(IMU_TITLE));
+  /* bench 时标题带 [BENCH]：屏幕上一眼能看出"这是注入数据、不是测量" */
+
+  {
+    static char title[40];
+
+    if (g_imu_bench)
+      {
+        snprintf(title, sizeof(title), "%s [BENCH]", PW_STR(IMU_TITLE));
+        g_i.scroller = pw_topbar(g_i.scr, title);
+      }
+    else
+      {
+        g_i.scroller = pw_topbar(g_i.scr, PW_STR(IMU_TITLE));
+      }
+  }
   lv_obj_set_size(g_i.scroller, IMU_PAGE_W, IMU_PAGE_H);
   lv_obj_set_scroll_dir(g_i.scroller, LV_DIR_HOR);
   lv_obj_set_scroll_snap_x(g_i.scroller, LV_SCROLL_SNAP_CENTER);
