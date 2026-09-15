@@ -58,6 +58,7 @@
 #include "pw_analysis.h"
 #include "phywear_sensors.h"
 #include "phywear_ui.h"
+#include "pw_btprobe.h"
 #include "pw_ahrs.h"
 #include "pw_calib.h"
 #include "phywear_imu.h"
@@ -879,6 +880,12 @@ int main(int argc, FAR char *argv[])
     {
       cap_screen = argv[2];
       argc = 1;
+    }
+
+  if (argc > 1 && strcmp(argv[1], "bthci") == 0)
+    {
+      pw_bt_probe();
+      return 0;
     }
 
   /* Real-device screenshot: `phywear shot <name>` opens the page, dumps one

@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-16 00:14:26",
- "generated_at_epoch": 1789488866,
+ "generated_at": "2026-09-16 00:20:11",
+ "generated_at_epoch": 1789489211,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 189,
-  "critical": 113,
-  "bytes": 8801380,
+  "files": 193,
+  "critical": 117,
+  "bytes": 8833972,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "ec3035a97c4ac9775953a95c83e66b07",
-   "size": 2389,
+   "md5": "5660316e39d0fb3aefcc1af004065b0b",
+   "size": 2406,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "f31c88e1683c48d37b78e56dfd2d207a",
-   "size": 53665,
+   "md5": "a4d7782842e8dbcba80813811152df0f",
+   "size": 53788,
    "present": true
   },
   {
@@ -465,6 +465,28 @@
   {
    "rule": "app",
    "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btprobe.c",
+   "dst": "apps/examples/phywear/pw_btprobe.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "2e242301a17bd361396134d63b1262ac",
+   "size": 3074,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btprobe.h",
+   "dst": "apps/examples/phywear/pw_btprobe.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "2335df9bc39fe43c300ecba3febd6cb4",
+   "size": 674,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
    "snap": "app/phywear/pw_calib.c",
    "dst": "apps/examples/phywear/pw_calib.c",
    "compare": "exact",
@@ -713,6 +735,28 @@
    "critical": true,
    "md5": "1ef5d62d6054f7f2b4432bf6c1830aa7",
    "size": 5165,
+   "present": true
+  },
+  {
+   "rule": "zblue-cmake",
+   "rule_desc": "zblue 端口构建接线（本队：把 H4 传输层加入构建）",
+   "snap": "src/apps/external/zblue/CMakeLists.default.txt",
+   "dst": "apps/external/zblue/CMakeLists.default.txt",
+   "compare": "exact",
+   "critical": true,
+   "md5": "4042fafe6b19764d85e26ab4eac6bf56",
+   "size": 27513,
+   "present": true
+  },
+  {
+   "rule": "zblue-hci",
+   "rule_desc": "zblue H4 端口补丁（本队新增：btsnoop 空实现垫片）",
+   "snap": "src/apps/external/zblue/zblue/port/drivers/bluetooth/hci/bt_snoop_stub.c",
+   "dst": "apps/external/zblue/zblue/port/drivers/bluetooth/hci/bt_snoop_stub.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "cdafaf6f515eb13c89d4eb1b6983c223",
+   "size": 1203,
    "present": true
   },
   {
@@ -1195,8 +1239,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "6cdf9df90cfde687ebf99497d59f7d5c",
-   "size": 8808,
+   "md5": "5629b89d717349bd427bae72448540e5",
+   "size": 8796,
    "present": true
   },
   {
