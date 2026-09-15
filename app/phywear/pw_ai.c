@@ -212,6 +212,131 @@ static long pw_ai_uptime_s(void)
   return (long)ts.tv_sec;
 }
 
+/****************************************************************************
+ * 实验结果登记
+ ****************************************************************************/
+
+static struct pw_ai_result_s g_pw_ai_res[PW_AI_RESULT_N];
+
+static struct pw_ai_result_s *pw_ai_result_slot(const char *kind)
+{
+  int i;
+  int free_i = -1;
+
+  for (i = 0; i < PW_AI_RESULT_N; i++)
+    {
+      if (g_pw_ai_res[i].kind[0] != '\0' &&
+          strcmp(g_pw_ai_res[i].kind, kind) == 0)
+        {
+          return &g_pw_ai_res[i];
+        }
+
+      if (free_i < 0 && g_pw_ai_res[i].kind[0] == '\0')
+        {
+          free_i = i;
+        }
+    }
+
+  if (free_i < 0)
+    {
+      /* 满了：轮转覆盖最旧的一个（seq 最小的） */
+
+      free_i = 0;
+
+      for (i = 1; i < PW_AI_RESULT_N; i++)
+        {
+          if (g_pw_ai_res[i].seq < g_pw_ai_res[free_i].seq)
+            {
+              free_i = i;
+            }
+        }
+    }
+
+  return &g_pw_ai_res[free_i];
+}
+
+void pw_ai_publish_result(const char *kind, float value, const char *unit,
+                          float aux, const char *detail)
+{
+  struct pw_ai_result_s *r;
+
+  if (kind == NULL || kind[0] == '\0')
+    {
+      return;
+    }
+
+  nxmutex_lock(&g_pw_ai_lock);
+
+  r = pw_ai_result_slot(kind);
+  strncpy(r->kind, kind, PW_AI_RESULT_KIND_MAX - 1);
+  r->kind[PW_AI_RESULT_KIND_MAX - 1] = '\0';
+  strncpy(r->unit, (unit != NULL) ? unit : "", PW_AI_RESULT_UNIT_MAX - 1);
+  r->unit[PW_AI_RESULT_UNIT_MAX - 1] = '\0';
+  strncpy(r->detail, (detail != NULL) ? detail : "",
+          PW_AI_RESULT_TEXT_MAX - 1);
+  r->detail[PW_AI_RESULT_TEXT_MAX - 1] = '\0';
+  r->value = value;
+  r->aux = aux;
+  r->seq++;
+
+  nxmutex_unlock(&g_pw_ai_lock);
+
+  syslog(LOG_INFO, "[phywear] result %s: %.4f %s (%s)\n",
+         kind, (double)value, unit != NULL ? unit : "", 
+         detail != NULL ? detail : "");
+}
+
+int pw_ai_result_seq(const char *kind)
+{
+  int seq = 0;
+  int i;
+
+  if (kind == NULL)
+    {
+      return 0;
+    }
+
+  nxmutex_lock(&g_pw_ai_lock);
+  for (i = 0; i < PW_AI_RESULT_N; i++)
+    {
+      if (g_pw_ai_res[i].kind[0] != '\0' &&
+          strcmp(g_pw_ai_res[i].kind, kind) == 0)
+        {
+          seq = g_pw_ai_res[i].seq;
+          break;
+        }
+    }
+
+  nxmutex_unlock(&g_pw_ai_lock);
+  return seq;
+}
+
+bool pw_ai_result_get(const char *kind, FAR struct pw_ai_result_s *out)
+{
+  bool found = false;
+  int i;
+
+  if (kind == NULL || out == NULL)
+    {
+      return false;
+    }
+
+  nxmutex_lock(&g_pw_ai_lock);
+  for (i = 0; i < PW_AI_RESULT_N; i++)
+    {
+      if (g_pw_ai_res[i].kind[0] != '\0' &&
+          strcmp(g_pw_ai_res[i].kind, kind) == 0)
+        {
+          *out = g_pw_ai_res[i];
+          found = true;
+          break;
+        }
+    }
+
+  nxmutex_unlock(&g_pw_ai_lock);
+  return found;
+}
+
 void pw_ai_note(const char *text)
 {
   int slot;
@@ -300,6 +425,27 @@ static void pw_ai_humanize(const char *raw, char *out, size_t out_size)
   if (raw == NULL || raw[0] == '\0')
     {
       return;
+    }
+
+  /* 工具自带 UI 文案时优先用它（例如实验结果的"已自动测重力加速度: g = ..."），
+   * 这样数值不会被压掉。 */
+
+  p = strstr(raw, "\"human\":\"");
+  if (p != NULL)
+    {
+      p += 9;   /* strlen("\"human\":\"") */
+
+      while (*p != '\0' && *p != '"' && n < out_size - 1)
+        {
+          out[n++] = *p++;
+        }
+
+      out[n] = '\0';
+
+      if (n > 0)
+        {
+          return;
+        }
     }
 
   /* 切页/跑实验：{"accepted":true,"screen":"pendulum",...} → “OK - pendulum” */

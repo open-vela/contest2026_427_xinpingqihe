@@ -47,6 +47,27 @@ extern int         pw_ai_request_open(const char *screen);
 extern bool        pw_ai_gui_running(void);
 extern const char *pw_ai_current_screen(void);
 
+/* 实验结果登记（apps/examples/phywear/pw_ai.c）。实验页在 GUI 线程里算完后发布，
+ * Agent 只读不采样 —— 避免 agent 任务与页面同时 50 Hz 抢同一个 I2C。 */
+
+#define PW_AI_RESULT_KIND_MAX   16
+#define PW_AI_RESULT_UNIT_MAX   12
+#define PW_AI_RESULT_TEXT_MAX   80
+
+struct pw_ai_result_s
+{
+  char  kind[PW_AI_RESULT_KIND_MAX];
+  char  unit[PW_AI_RESULT_UNIT_MAX];
+  char  detail[PW_AI_RESULT_TEXT_MAX];
+  int   seq;
+  float value;
+  float aux;
+};
+
+extern int  pw_ai_result_seq(const char *kind);
+extern bool pw_ai_result_get(const char *kind, struct pw_ai_result_s *out);
+extern void pw_ai_note(const char *text);
+
 struct pw_ai_imu_s
 {
   int ax;
@@ -382,10 +403,13 @@ int tool_phywear_sensor_execute(const char *input_json, char *output,
 /****************************************************************************
  * phywear_run_experiment
  *
- * Opens the requested experiment page and samples the accelerometer for the
- * given number of seconds, so the agent gets real numbers to reason about.
- * The experiment's own on-screen result (period, g, radius ...) is produced
- * by the PhyWear UI itself and is not exposed through this tool yet.
+ * Opens the requested experiment page, then waits for the page itself to
+ * register a result (see pw_ai_publish_result) and returns those numbers.
+ *
+ * The agent deliberately does NOT sample the IMU here: the page already
+ * samples at 50 Hz, and two 50 Hz readers on the same I2C bus used to freeze
+ * the whole device after ~10 s (that is why the proactive scenario was
+ * disabled). Only the GUI/experiment path touches the sensor now.
  ****************************************************************************/
 
 int tool_phywear_run_execute(const char *input_json, char *output,
@@ -394,13 +418,7 @@ int tool_phywear_run_execute(const char *input_json, char *output,
 #ifdef CONFIG_EXAMPLES_PHYWEAR
   const char *screen = NULL;
   int seconds = 5;
-  int samples = 0;
-  int i;
-  int n;
   int ret;
-  int axmin = 0, axmax = 0, aymin = 0, aymax = 0, azmin = 0, azmax = 0;
-  long axsum = 0, aysum = 0, azsum = 0;
-  double axmean, aymean, azmean;
   cJSON *root;
   cJSON *item;
   cJSON *r;
@@ -459,40 +477,72 @@ int tool_phywear_run_execute(const char *input_json, char *output,
       return ERROR;
     }
 
-  /* Sample the IMU at about 50 Hz while the experiment page is on screen. */
+  /* 不再在 agent 任务里采样 IMU。原先这里按 50 Hz 采 N 秒，而屏幕上的实验页
+   * 同时也在 50 Hz 采同一颗传感器 —— 两路 50 Hz 抢同一个 I2C（oneshot 每样本还
+   * open/ioctl/close 一次），真机实测十几秒整机卡死，主动场景因此被关。
+   *
+   * 现在只"等页面把结果登记出来"：I2C 永远只有 GUI 那一路。等不到就如实报
+   * unavailable（不编造数字）。 */
 
-  n = seconds * 50;
-  for (i = 0; i < n; i++)
-    {
-      struct pw_ai_imu_s imu;
+  {
+    int before = pw_ai_result_seq(screen);
+    int waited = 0;
 
-      memset(&imu, 0, sizeof(imu));
-      if (pw_sensors_read_imu_oneshot(&imu) == 0)
+    while (waited < seconds * 1000)
+      {
+        usleep(100 * 1000);
+        waited += 100;
+
+        if (pw_ai_result_seq(screen) != before)
+          {
+            break;
+          }
+      }
+
+    struct pw_ai_result_s res;
+
+    memset(&res, 0, sizeof(res));
+
+    if (pw_ai_result_get(screen, &res))
+      {
+        r = cJSON_CreateObject();
+
+        if (r == NULL)
+          {
+            cJSON_Delete(root);
+            return ERROR;
+          }
+
+        cJSON_AddBoolToObject(r, "accepted", true);
+        cJSON_AddStringToObject(r, "screen", screen);
+        cJSON_AddStringToObject(r, "result", "ok");
+        cJSON_AddNumberToObject(r, "value", (double)res.value);
+        cJSON_AddStringToObject(r, "unit", res.unit);
+        cJSON_AddNumberToObject(r, "aux", (double)res.aux);
+        cJSON_AddStringToObject(r, "detail", res.detail);
+        cJSON_AddNumberToObject(r, "waited_ms", (double)waited);
+        cJSON_AddStringToObject(r, "source",
+                                "experiment page (GUI thread)");
+        /* human 字段：手表上要显示的那一行。pw_ai_humanize() 优先用它，
+         * 这样纯 UI 文案不用散落在工具里（且用字已核对在本队 CJK 字体子集内：
+         * "完"字缺，所以写"已自动测…"而不是"…完成"）。 */
+
         {
-          if (samples == 0)
-            {
-              axmin = axmax = imu.ax;
-              aymin = aymax = imu.ay;
-              azmin = azmax = imu.az;
-            }
-          else
-            {
-              if (imu.ax < axmin) axmin = imu.ax;
-              if (imu.ax > axmax) axmax = imu.ax;
-              if (imu.ay < aymin) aymin = imu.ay;
-              if (imu.ay > aymax) aymax = imu.ay;
-              if (imu.az < azmin) azmin = imu.az;
-              if (imu.az > azmax) azmax = imu.az;
-            }
+          char msg[128];
 
-          axsum += imu.ax;
-          aysum += imu.ay;
-          azsum += imu.az;
-          samples++;
+          snprintf(msg, sizeof(msg),
+                   "已自动测重力加速度: g = %.2f %s (T = %.3f s)",
+                   (double)res.value, res.unit, (double)res.aux);
+          cJSON_AddStringToObject(r, "human", msg);
         }
 
-      usleep(20 * 1000);
-    }
+        pw_tool_emit(r, output, output_size, OK);   /* 注意：emit 内部会 free(r) */
+        cJSON_Delete(root);
+        return OK;
+      }
+  }
+
+  /* 等到超时都没有新结果：如实报告，不编数字。 */
 
   r = cJSON_CreateObject();
   if (r == NULL)
@@ -503,39 +553,19 @@ int tool_phywear_run_execute(const char *input_json, char *output,
 
   cJSON_AddBoolToObject(r, "accepted", true);
   cJSON_AddStringToObject(r, "screen", screen);
-  cJSON_AddNumberToObject(r, "seconds", (double)seconds);
-  cJSON_AddNumberToObject(r, "samples", (double)samples);
-
-  if (samples > 0)
-    {
-      axmean = (double)axsum / (double)samples;
-      aymean = (double)aysum / (double)samples;
-      azmean = (double)azsum / (double)samples;
-
-      cJSON_AddStringToObject(r, "unit", "mg");
-      cJSON_AddNumberToObject(r, "ax_mean", axmean);
-      cJSON_AddNumberToObject(r, "ay_mean", aymean);
-      cJSON_AddNumberToObject(r, "az_mean", azmean);
-      cJSON_AddNumberToObject(r, "ax_min", (double)axmin);
-      cJSON_AddNumberToObject(r, "ax_max", (double)axmax);
-      cJSON_AddNumberToObject(r, "ay_min", (double)aymin);
-      cJSON_AddNumberToObject(r, "ay_max", (double)aymax);
-      cJSON_AddNumberToObject(r, "az_min", (double)azmin);
-      cJSON_AddNumberToObject(r, "az_max", (double)azmax);
-      cJSON_AddStringToObject(r, "note",
-                              "This is a raw accelerometer summary. The "
-                              "experiment result (period, g, radius ...) is "
-                              "computed and shown on the watch display.");
-    }
-  else
-    {
-      cJSON_AddStringToObject(r, "error",
-                              "no accelerometer samples available");
-    }
-
-  pw_tool_emit(r, output, output_size, samples > 0 ? OK : ERROR);
+  cJSON_AddStringToObject(r, "result", "unavailable");
+  cJSON_AddStringToObject(r, "human",
+                          "no experiment result (device not moved, or this "
+                          "page has no readable result yet)");
+  cJSON_AddNumberToObject(r, "waited_ms", (double)(seconds * 1000));
+  cJSON_AddStringToObject(r, "note",
+                          "The experiment page did not register a result in "
+                          "time. Either the watch was not moved, or this page "
+                          "does not expose a machine-readable result yet. "
+                          "For a single raw reading use phywear_read_sensor.");
+  pw_tool_emit(r, output, output_size, ERROR);   /* emit 内部会 free(r) */
   cJSON_Delete(root);
-  return samples > 0 ? OK : ERROR;
+  return ERROR;
 #else
   pw_tool_emit_str("error", "PhyWear is not built into this image", output,
                    output_size);

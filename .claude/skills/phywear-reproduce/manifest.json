@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-15 19:55:30",
- "generated_at_epoch": 1789473330,
+ "generated_at": "2026-09-15 20:58:28",
+ "generated_at_epoch": 1789477108,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 172,
-  "critical": 96,
-  "bytes": 8379069,
+  "files": 176,
+  "critical": 100,
+  "bytes": 8403169,
   "missing_in_workspace": 0
  },
  "files": [
@@ -183,8 +183,8 @@
    "dst": "apps/examples/phywear/phywear_pend.c",
    "compare": "exact",
    "critical": true,
-   "md5": "a26372d9b09fd1b622496a76c8d28f36",
-   "size": 29306,
+   "md5": "ebfd2e84a0c5e18eeb8d9ed500dc283a",
+   "size": 32981,
    "present": true
   },
   {
@@ -370,8 +370,8 @@
    "dst": "apps/examples/phywear/pw_ai.c",
    "compare": "exact",
    "critical": true,
-   "md5": "fc730486322da5e0b5525b55dc2725df",
-   "size": 10296,
+   "md5": "a2905978379bc1c64551435b02aeaf16",
+   "size": 13507,
    "present": true
   },
   {
@@ -381,8 +381,8 @@
    "dst": "apps/examples/phywear/pw_ai.h",
    "compare": "exact",
    "critical": true,
-   "md5": "622de5c9d3cbf01217af57bc00b13ba2",
-   "size": 4392,
+   "md5": "40e89b55f91315c5f0411712de688aa3",
+   "size": 6530,
    "present": true
   },
   {
@@ -601,8 +601,8 @@
    "dst": "apps/examples/phywear/pw_watch.c",
    "compare": "exact",
    "critical": true,
-   "md5": "fe76956edf6f88db50886a87d448e95f",
-   "size": 7292,
+   "md5": "cb254e062720ba87c9eb2f0e25536f15",
+   "size": 6853,
    "present": true
   },
   {
@@ -762,6 +762,39 @@
   {
    "rule": "aiagent",
    "rule_desc": "packages/ai_agent（本队新增 4 个 phywear 工具 + 关键词意图 + 构建接线）",
+   "snap": "src/packages/ai_agent/src/core/message_bus.c",
+   "dst": "packages/ai_agent/src/core/message_bus.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "1262d6b0f4a3445ad204a99cd328ede3",
+   "size": 6613,
+   "present": true
+  },
+  {
+   "rule": "aiagent",
+   "rule_desc": "packages/ai_agent（本队新增 4 个 phywear 工具 + 关键词意图 + 构建接线）",
+   "snap": "src/packages/ai_agent/src/core/message_bus.h",
+   "dst": "packages/ai_agent/src/core/message_bus.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "d22c3763665fa68bb4f83ae199bd5117",
+   "size": 2965,
+   "present": true
+  },
+  {
+   "rule": "aiagent",
+   "rule_desc": "packages/ai_agent（本队新增 4 个 phywear 工具 + 关键词意图 + 构建接线）",
+   "snap": "src/packages/ai_agent/src/sdk/velaclaw_client_local.c",
+   "dst": "packages/ai_agent/src/sdk/velaclaw_client_local.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "5c80f53f0cac83ddc0a6d89d2ad8d02d",
+   "size": 4376,
+   "present": true
+  },
+  {
+   "rule": "aiagent",
+   "rule_desc": "packages/ai_agent（本队新增 4 个 phywear 工具 + 关键词意图 + 构建接线）",
    "snap": "src/packages/ai_agent/src/tools/skill_loader.c",
    "dst": "packages/ai_agent/src/tools/skill_loader.c",
    "compare": "exact",
@@ -777,8 +810,8 @@
    "dst": "packages/ai_agent/src/tools/tool_phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "337847cd9c6199bd5f6bd0d2378445ce",
-   "size": 15880,
+   "md5": "89de356006513285400f89af2fde4901",
+   "size": 17304,
    "present": true
   },
   {
@@ -1043,6 +1076,17 @@
    "critical": true,
    "md5": "5c0e0cac812ede4e8f20bbde2003afc8",
    "size": 12932,
+   "present": true
+  },
+  {
+   "rule": "bsp-our",
+   "rule_desc": "黄山派 BSP 本队改动（启动时序等待、/dev/spk0 注册）",
+   "snap": "src/vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/src/etc/init.d/rc.sysinit",
+   "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/src/etc/init.d/rc.sysinit",
+   "compare": "exact",
+   "critical": true,
+   "md5": "f674d0aa5d7eee33c651bed0f3fe2ff3",
+   "size": 137,
    "present": true
   },
   {

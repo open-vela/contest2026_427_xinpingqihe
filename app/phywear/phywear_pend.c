@@ -58,7 +58,10 @@
 #include "pw_analysis.h"
 #include "pw_scope.h"
 #include "pw_graph.h"
+#include <syslog.h>
+
 #include "phywear_pend.h"
+#include "pw_ai.h"
 #include "phywear_i18n.h"
 
 /****************************************************************************
@@ -83,6 +86,16 @@
 #define MOTION_STD      180.0f         /* 标准差阈值（mdps） */
 
 #define MIN_ANALYZE     80             /* 窗口 <1.6s 不分析 */
+
+/* 是否值得把这次 g 上报给 AI Agent 的**有效性窗口**。
+ * 单摆实验测地球重力加速度，落在 5..15 m/s² 之外说明这次"测量"本身是失败的：
+ * 真机实测（手表静止放桌上 / 挂在线缆上轻微晃）页面也能凑出
+ * 1.43 / 2.76 / 4.08 / 22.99 m/s² 这类值。窗口取得很宽（约 ±50%），
+ * 不是把 9.8 写死；而且**只决定要不要上报给 Agent**，页面上显示的原始数值
+ * 一律不做过滤、不做隐藏（页面的 0.5..25 自身判据也不动）。 */
+#define PUB_G_MIN       5.0f
+#define PUB_G_MAX       15.0f
+
 
 #define PEND_PAGES      4
 #define PAGE_W          390
@@ -137,6 +150,10 @@ struct pend_ui_s
   int         n;
   int         tick;
   int         have_val;
+  uint32_t    last_pub_ms;   /* 结果发布节流（给 AI Agent 用） */
+  float       pub_prev;      /* 上一次算出的 g（稳定性门控用） */
+  int         pub_n;         /* 上次评估时的样本数（要求有新数据才算独立估计） */
+  int         pub_hits;      /* 连续"彼此接近"的次数 */
   int         bad_streak;
 };
 
@@ -487,6 +504,78 @@ static void pend_analyze(void)
   lv_label_set_text_fmt(g_p.ac_lab, PW_STR(FIRST_PEAK_FMT),
                         (double)T);
   pend_update_status(PW_STR(PEND_STATUS_LIVE), G_ACC);
+
+  /* 把结果登记给 AI Agent（GUI 线程内发布，Agent 只读不采样）。
+   * 这样 Agent 的 run_experiment 不再自己去抢 I2C —— 见 pw_ai.h 的说明。 */
+
+  /* 节流到 ~1Hz：pend_analyze() 每几百毫秒就会算出一次结果，逐次发布会把
+   * syslog 和 Agent 的结果序号刷爆（实测 0.36s 一条）。Agent 只关心"有没有
+   * 新结果"，1Hz 足够。
+   *
+   * 稳定性门控：只发布"连续两次分析结果接近"（±8%）的 g。
+   * 为什么需要：手表静止放在桌上时，桌面振动与传感器噪声也能凑出一个"周期"，
+   * 页面于是刷出 g = 22.99 / 0.91 m/s² 这类物理上不可能的值（真机实测）。
+   * 主动场景若把这种数字报给 Agent，就是"结论不实"。
+   * 注意这不是把"正确答案"写死 —— 只要求估计**稳定**；真的摆动一次，
+   * 连续几次周期估计本来就一致，照样通过。 */
+
+  /* 关键：必须"有足够新数据"才算一次独立估计。
+   * pend_analyze() 每个 tick 都会跑，而数据窗只在每 HIST 拍才前进 —— 连续两次
+   * 分析的是**同一段数据**，结果必然全等，于是稳定性检查形同虚设（真机实测：
+   * 静止桌面上连续两次都给出 T=1.919s / g=5.3615，照样被当成"稳定"发布）。
+   * 这里要求至少 1s（50 样本）新数据，噪声驱动出来的周期就凑不出两次一致。 */
+
+  if (g_p.n - g_p.pub_n < 50)
+    {
+      goto pub_done;
+    }
+
+  if (gval < PUB_G_MIN || gval > PUB_G_MAX)
+    {
+      /* 每 5s 留一条证据：拦下了多少、为什么（便于审阅与事后校准） */
+
+      if ((int)(lv_tick_get() - g_p.last_pub_ms) > 5000)
+        {
+          g_p.last_pub_ms = lv_tick_get();
+          syslog(LOG_INFO, "[phywear] pendulum result withheld: "
+                 "g=%.2f out of %.1f..%.1f m/s^2 (implausible measurement)\n",
+                 (double)gval, (double)PUB_G_MIN, (double)PUB_G_MAX);
+        }
+
+      g_p.pub_hits = 0;
+      goto pub_done;
+    }
+
+  g_p.pub_n = g_p.n;
+
+  if (g_p.pub_hits > 0 && fabsf(gval - g_p.pub_prev) <= 0.08f * g_p.pub_prev)
+    {
+      g_p.pub_hits++;
+    }
+  else
+    {
+      g_p.pub_hits = 1;
+    }
+
+  g_p.pub_prev = gval;
+
+  if (g_p.pub_hits >= 2)
+    {
+      uint32_t now = lv_tick_get();
+
+      if (now - g_p.last_pub_ms >= 1000u)
+        {
+          char detail[PW_AI_RESULT_TEXT_MAX];
+
+          g_p.last_pub_ms = now;
+          snprintf(detail, sizeof(detail),
+                   "T=%.3fs f=%.3fHz L=%.3fm", (double)T, (double)(1.0f / T),
+                   (double)g_p.L);
+          pw_ai_publish_result("pendulum", gval, "m/s^2", T, detail);
+        }
+    }
+
+pub_done:
 
   /* 共振历史攒点：每次有效测量记录 (频率, 相对幅度) */
 

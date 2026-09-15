@@ -103,4 +103,47 @@ const char *pw_ai_log_line(int idx);
 
 long        pw_ai_log_age_s(int idx);
 
+/****************************************************************************
+ * 实验结果登记（GUI 线程写 / Agent 任务读）
+ *
+ * 为什么需要它：Agent 的 phywear_run_experiment 原来在 **agent 任务里**按 50 Hz
+ * 自己采一遍 IMU，而屏幕上那个实验页同时也在 50 Hz 采同一颗传感器 → 两路 50 Hz
+ * 抢同一个 I2C（oneshot 还每样本 open/ioctl/close 一次），真机实测十几秒整机卡死，
+ * 主动场景因此被关掉（pw_watch.c 里 PW_WATCH_PROACTIVE=0）。
+ *
+ * 现在改成：**只有 GUI 线程那条通路采样**；实验页算完把结果登记到这里，
+ * Agent 只"等结果 + 读结果"。I2C 永远只有一路。
+ *
+ * 线程安全：发布方是 GUI 线程（实验页 tick），读取方是 Agent 任务，用互斥锁保护；
+ * 双方都不碰 LVGL 对象。
+ ****************************************************************************/
+
+#define PW_AI_RESULT_N          4     /* 最近 4 个实验各留一份 */
+#define PW_AI_RESULT_KIND_MAX   16
+#define PW_AI_RESULT_UNIT_MAX   12
+#define PW_AI_RESULT_TEXT_MAX   80
+
+struct pw_ai_result_s
+{
+  char  kind[PW_AI_RESULT_KIND_MAX];   /* "pendulum" / "spring" / "incline" ... */
+  char  unit[PW_AI_RESULT_UNIT_MAX];   /* "m/s^2" ... */
+  char  detail[PW_AI_RESULT_TEXT_MAX]; /* 页面自己显示的那一行（人类可读） */
+  int   seq;                           /* 同一 kind 每发布一次 +1；等待方靠它判断新旧 */
+  float value;                         /* 主结果 */
+  float aux;                           /* 次结果（如周期 T），无则 0 */
+};
+
+/* 发布一条实验结果（GUI 线程调用；kind 相同则覆盖，seq 自增）。 */
+
+void pw_ai_publish_result(const char *kind, float value, const char *unit,
+                          float aux, const char *detail);
+
+/* 取某实验当前结果序号；没有该 kind 返回 0。等待方先读一次、再轮询比较。 */
+
+int pw_ai_result_seq(const char *kind);
+
+/* 读某实验当前结果；成功返回 true 并填充 out。 */
+
+bool pw_ai_result_get(const char *kind, FAR struct pw_ai_result_s *out);
+
 #endif /* __APPS_EXAMPLES_PHYWEAR_PW_AI_H */

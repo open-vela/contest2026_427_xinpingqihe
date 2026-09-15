@@ -342,11 +342,23 @@ def check_markers(rep: Report) -> None:
     rep.add(f"{p}-skillblob", "Skill 自动安装（真机 /data/agent/skills/）", OK if ok else FAIL,
             f"blob 内嵌 + 正本 {skill_md.stat().st_size} B" if ok else "blob 或正本缺失")
 
+    # 主动场景：2026-09-15 起默认**打开**（"主动 + 执行"场景交付）。
+    # 硬性前提是"推送必须走受保护的 pw_ai_ask()"，不能直连 velaclaw_ask ——
+    # 后者在 ai_agent 没起来时会在 msg_queue_push→pthread_mutex_take 撞
+    # DEBUGASSERT 把 GUI 整个带崩（真机/模拟器都实测过）。这里两条一起查。
     watch = read_text(app / "pw_watch.c")
     m = re.search(r"#\s*define\s+PW_WATCH_PROACTIVE\s+(\d)", watch)
-    rep.add(f"{p}-proactive", "主动场景默认开关（如实口径：默认关闭）",
-            OK if m and m.group(1) == "0" else WARN,
-            f"PW_WATCH_PROACTIVE {m.group(1)}" if m else "未找到宏")
+    uses_ask = "pw_ai_ask(" in watch
+    direct = "velaclaw_ask(" in watch
+    if m is None:
+        rep.add(f"{p}-proactive", "主动场景（默认开 + 走受保护 pw_ai_ask）", WARN, "未找到宏")
+    elif m.group(1) == "1" and uses_ask and not direct:
+        rep.add(f"{p}-proactive", "主动场景（默认开 + 走受保护 pw_ai_ask）", OK,
+                "PW_WATCH_PROACTIVE 1，推送走 pw_ai_ask（Agent 不在时不 panic）")
+    else:
+        rep.add(f"{p}-proactive", "主动场景（默认开 + 走受保护 pw_ai_ask）", WARN,
+                f"PW_WATCH_PROACTIVE {m.group(1)}，pw_ai_ask={uses_ask}，"
+                f"直连 velaclaw_ask={direct}")
 
     n_src = len(list(app.glob("*.c"))) + len(list(app.glob("*.h")))
     gen = len(list(app.glob("pw_font_*.c")))

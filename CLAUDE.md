@@ -25,8 +25,9 @@
 | 本地领先官方 | **11+ 个提交攒在本地**（以 `submit_427.sh --status` 为准，此表不追自增计数） |
 | 官方仓分支 | `a83ad3e686d1`（PR #11/#12/#13 已合并） |
 | 待合并 PR | **#14**（已推送、`mergeable=true/clean`、7 提交：MiMo 的 JUDGES.md + 协作记忆 + 打包修复 + 规则 S14）；按新策略可留到完结一起合 |
-| 下一步任务 | **UI 第二批 (a)(b)(c) 已完成 + 真机复验**（见 `docs/evidence/ui-batch2-20260915/`）；秒表页 fps 少 1 帧（10.3→9，可选修法见该 README §4）；按用户指示**先交付本批**，不再自行铺开新页面 |
-| 真机固件 | 板上 `c6bf6e688b34c8da162788acf61d8a92`（**2,064,640 B**，flash 12.31%；SRAM 490,824 B / 93.62%）；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
+| 下一步任务 | 用户批准的六项顺序：**② 主页文案 ✅ → ① 三轴页双视图+每轴独立量程 ✅ → ⑤-1 主动+执行 ✅ → ③ 惯性标尺/标定 → ④ 蓝牙探针 → 演示视频**。③ 待用户拍板「生活/工具」板块与是否参与真值测量；④ 按"半天探针 + 允许 no-go" |
+| ⑤-1 主动场景 | 已打通并真机验证（`docs/evidence/proactive-20260915/`）：晃表 → Agent 自动跑单摆实验 → 结果进手表 AI 日志。修掉两个真崩溃（message_bus 未初始化时 push 断言、工具 cJSON 双重释放）；补上 `ai_agent` 开机自启（板级 `etc/init.d/rc.sysinit`）。**待用户挥手确认"真实摆动 → 可信 g"**；三道有效性门有残余漏过（70s 内 1 条），根治需改单摆页运动判据 |
+| 真机固件 | 板上 `7dd26b346a001d0b536430489e363d7c`（**2,066,040 B**，flash 12.31%；SRAM 491,320 B / 93.71%）；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
 | 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— **09-15 已插上**（烧录前先 `fuser /dev/ttyUSB0` 确认空闲、关 picocom） |
 | AI 日志 | `logs/XPQHyue/` **50 会话 / 15,283 事件**，`validate-log.py` ✅ ALL OK |
 | 回退点 | `~/桌面/PhyWear-rollback-20260915-0002/`（含改动前固件 `484b64ca…`，本批真机 A/B 用的就是它；`rollback.sh --check`） |
@@ -41,7 +42,7 @@
 5. **只许 rebase**：不许产生 merge commit；提交作者固定 `XPQHyue <15770782523@163.com>`。
 6. **改完必须回仓**：工作区（`~/openvela`）改动要 `sync_back.py --execute` + 重生成 `manifest.json`，否则评审 clone 看不到。
 7. **数据可追溯**：每个数字都要指到代码/日志/证据；**模拟器数据 ≠ 真机测量**；未实现不得写成已实现（写进「已知限制」不扣分）。
-8. **归属如实**：EPIC 硬件加速来自官方 PR #31/#41/#121（非本队原创）；phyphox 仅灵感来源（见 `app/phywear/NOTICE.md`）；主动场景默认关闭；真机无网络栈。
+8. **归属如实**：EPIC 硬件加速来自官方 PR #31/#41/#121（非本队原创）；phyphox 仅灵感来源（见 `app/phywear/NOTICE.md`）；主动场景**默认开启**（`PW_WATCH_PROACTIVE 1`，推送走受保护的 `pw_ai_ask()`，Agent 不在时不 panic）；`ai_agent` 已开机自启；真机无网络栈。
 
 9. **PR 合并后必须先把本地 rebase 到官方最新再继续**：rebase-merge 会改写 SHA，本地若还带着旧 SHA 的提交，
    新 PR 会显示成"重复提交 + 冲突"（`mergeable=false / dirty`）。正确顺序：

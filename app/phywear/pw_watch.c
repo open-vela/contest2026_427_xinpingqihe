@@ -21,27 +21,26 @@
 
 #include "pw_watch.h"
 #include "phywear_sensors.h"
-
-#ifdef CONFIG_EXAMPLES_AI_AGENT_VELA
-#  include <velaclaw/client.h>
-#endif
+#include "pw_ai.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* 主动场景开关：检测到"持续摆动"后是否把事件推给 AI Agent 并让它自动跑
- * 单摆实验。
+/* 主动场景开关：检测到"持续摆动"后把事件推给 AI Agent，让它自动跑单摆实验
+ * 并解释结果（"主动 + 执行"场景）。
  *
- * ⚠️ 默认关闭（2026-09-13 真机实测）：Agent 侧的 phywear_run_experiment 会在
- * **agent 任务**里直接读传感器、并请求 GUI 打开实验页，两条线程同时用同一颗
- * IMU + 同时切页，实测启动后十几秒就整机卡住。检测本身保留（只打日志），
- * 主动场景改用不抢传感器的方式重做（见 docs/主动场景说明）。
+ * 历史：2026-09-13 真机实测启动后十几秒整机卡住，故默认关闭。2026-09-15 定位到
+ * **真正的卡死原因**：不是切页，而是 `phywear_run_experiment` 在 **agent 任务**里
+ * 又按 50 Hz 采了一遍 IMU，而屏幕上的实验页同时也在 50 Hz 采同一颗传感器
+ * （oneshot 每样本还 open/ioctl/close 一次）→ 两路 50 Hz 抢同一个 I2C。
  *
- * 需要复现原行为时把它置 1。 */
+ * 修法（本次）：Agent 侧**不再采样**，改为"开页 → 等实验页把结果登记出来 → 读结果"
+ * （见 pw_ai.h 的 pw_ai_publish_result）。I2C 永远只有 GUI 一路，因此重新打开。
+ * ⚠️ 打开后必须真机泡机复验（反复晃动 + ≥10 min），若再卡死立即置 0 并如实记录。 */
 
 #ifndef PW_WATCH_PROACTIVE
-#  define PW_WATCH_PROACTIVE 0
+#  define PW_WATCH_PROACTIVE 1
 #endif
 
 /* One IMU sample every 100 ms: enough to see a 0.5-2 Hz swing without
@@ -77,24 +76,10 @@ static int g_pw_watch_hold;
 static time_t g_pw_watch_last_fire;
 static struct timespec g_pw_watch_last_sample;
 
-#if defined(CONFIG_EXAMPLES_AI_AGENT_VELA) && PW_WATCH_PROACTIVE
-static velaclaw_client_t *g_pw_watch_client;
-#endif
-
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-#if defined(CONFIG_EXAMPLES_AI_AGENT_VELA) && PW_WATCH_PROACTIVE
-static void pw_watch_reply(int status, const char *text, void *cookie)
-{
-  (void)cookie;
-
-  syslog(LOG_INFO, "[phywear] proactive agent reply (%d): %.120s\n",
-         status, text != NULL ? text : "(null)");
-}
-
-#endif /* CONFIG_EXAMPLES_AI_AGENT_VELA && PW_WATCH_PROACTIVE */
 
 /* Push the event text to the agent.  With CONFIG_EXAMPLES_AI_AGENT_VELA the
  * agent is linked in and answers asynchronously; otherwise the event is only
@@ -113,33 +98,21 @@ static void pw_watch_notify(float range, float seconds, long uptime_s)
            (double)(range / 1000.0f), (double)seconds);
 
   syslog(LOG_WARNING, "[phywear] t=%lds %s\n", uptime_s, text);
+  pw_ai_note(text);
 
 #if defined(CONFIG_EXAMPLES_AI_AGENT_VELA) && PW_WATCH_PROACTIVE
-  /* The agent may still be starting when PhyWear comes up (or the user may
-   * start it later), so retry the link here instead of giving up for good. */
+  /* 统一走 pw_ai_ask()（而不是自己再开一个 velaclaw 客户端）：
+   *   - 只有一个客户端实例，避免重复注册 tap；
+   *   - 回复由 pw_ai_ask_cb 自动 humanize 后写进手表的 AI 消息日志；
+   *   - Agent 没起来时 velaclaw_client_open() 会干净返回 NULL（总线未初始化的
+   *     探测在客户端里做），这里只记一条日志，**不会 panic**。
+   *     （2026-09-15 实测：Agent 没起时直接 velaclaw_ask 会在
+   *      msg_queue_push→pthread_mutex_take 撞 DEBUGASSERT 把 GUI 带崩。） */
 
-  if (g_pw_watch_client == NULL)
+  if (pw_ai_ask(text) != 0)
     {
-      g_pw_watch_client = velaclaw_client_open("phywear");
-
-      if (g_pw_watch_client == NULL)
-        {
-          syslog(LOG_WARNING, "[phywear] agent client unavailable; "
-                 "proactive events will only be logged\n");
-        }
-    }
-
-  if (g_pw_watch_client != NULL)
-    {
-      velaclaw_ask_req_t req;
-
-      req.text = text;
-      req.timeout_ms = 0;
-
-      if (velaclaw_ask(g_pw_watch_client, &req, pw_watch_reply, NULL) != 0)
-        {
-          syslog(LOG_ERR, "[phywear] cannot reach the agent\n");
-        }
+      syslog(LOG_WARNING, "[phywear] proactive event not delivered "
+             "(agent not running?); kept in the AI log anyway\n");
     }
 #else
   syslog(LOG_INFO, "[phywear] proactive push disabled: event only logged\n");
@@ -159,15 +132,6 @@ void pw_watch_init(void)
   g_pw_watch_last_fire = 0;
   clock_gettime(CLOCK_MONOTONIC, &g_pw_watch_last_sample);
 
-#if defined(CONFIG_EXAMPLES_AI_AGENT_VELA) && PW_WATCH_PROACTIVE
-  g_pw_watch_client = velaclaw_client_open("phywear");
-
-  if (g_pw_watch_client == NULL)
-    {
-      syslog(LOG_WARNING, "[phywear] agent client unavailable; "
-             "proactive events will only be logged\n");
-    }
-#endif
 }
 
 bool pw_watch_poll(void)
