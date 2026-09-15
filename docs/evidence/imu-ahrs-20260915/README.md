@@ -40,7 +40,7 @@ ahrs selftest: rc=0 max_attitude_err=0.879 deg
 ahrs done: 300 samples, 0 with mag        ← 模拟器没有 /dev/mag0，自动退化为 6 轴
 ```
 
-### 2.3 真机（立创黄山派 SF32LB52，md5 `301b3fa1907439475ad8604ce13b739d`）
+### 2.3 真机（立创黄山派 SF32LB52；板上固件 md5 `ac1d5c699d7724409549ad91d650aff0`，2,076,244 B —— 注：固件非可重现构建，md5 每次重编都会变）
 
 ```
 phywear calib        → calib selftest: rc=0 worst_rel_err=0.0628

@@ -29,7 +29,7 @@
 | ③ 惯性标尺 | 代码核心已交付并三层验证（`docs/evidence/imu-ahrs-20260915/`）：`pw_ahrs`（Mahony MARG，状态 76 B）+ `pw_calib`（六面法/磁椭球/陀螺零偏，全流式充分统计）+ 主机单测 `tools/phywear/hosttest_math.sh` + 真机无头入口 `phywear ahrs/calib`。真机实测：AHRS 与加速度计解算倾角一致 ~0.5°；mag 开后 yaw 稳定不漂。**精度指标仍无转台真值**；磁软铁只能定到一个未知旋转 |
 | ⚠️ SRAM 额度 | 累计 **+2,136 B**（491,576 B / 93.76%），**已超"不超过 ~2 KB"约 88 B** —— 已向用户报告并请其定口径（③ 的 UI 落地前必须定） |
 | ⑤-1 主动场景 | 已打通并真机验证（`docs/evidence/proactive-20260915/`）：晃表 → Agent 自动跑单摆实验 → 结果进手表 AI 日志。修掉两个真崩溃（message_bus 未初始化时 push 断言、工具 cJSON 双重释放）；补上 `ai_agent` 开机自启（板级 `etc/init.d/rc.sysinit`）。**待用户挥手确认"真实摆动 → 可信 g"**；三道有效性门有残余漏过（70s 内 1 条），根治需改单摆页运动判据 |
-| 真机固件 | 板上 `301b3fa1907439475ad8604ce13b739d`（**2,067,024 B**，flash 12.31%；SRAM 491,576 B / 93.76%）；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
+| 真机固件 | 板上 `ac1d5c699d7724409549ad91d650aff0`（**2,076,244 B**，flash 12.4%；SRAM 491,576 B / 93.76%）；⚠️ 固件**非可重现构建**（镜像嵌构建时间），md5 只在「板上 vs 同一产物」时有意义；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
 | 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— **09-15 已插上**（烧录前先 `fuser /dev/ttyUSB0` 确认空闲、关 picocom） |
 | AI 日志 | `logs/XPQHyue/` **50 会话 / 15,283 事件**，`validate-log.py` ✅ ALL OK |
 | 回退点 | `~/桌面/PhyWear-rollback-20260915-0002/`（含改动前固件 `484b64ca…`，本批真机 A/B 用的就是它；`rollback.sh --check`） |
