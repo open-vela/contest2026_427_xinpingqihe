@@ -97,6 +97,15 @@ int pw_sensors_read_imu(FAR struct pw_imu_s *out);
 
 int pw_sensors_read_imu_oneshot(FAR struct pw_imu_s *out);
 
+/* 一次性读地磁 / 环境光：同样在本任务里 open/read/close。
+ * 为什么也要（2026-09-15 复核）：mag/light 原先只有走 g_mag_fd/g_light_fd
+ * 的缓存路径，而 NuttX fd 属于任务组 —— AI Agent 任务里读会拿到 EBADF，
+ * 与 accel 那个已修 bug 同源（只是离线意图表没覆盖 mag/light，所以一直没暴露）。
+ * 工具的 phywear_read_sensor 现在也用这两个接口。 */
+
+int pw_sensors_read_mag_oneshot(FAR struct pw_mag_s *out);
+int pw_sensors_read_light_oneshot(FAR struct pw_light_s *out);
+
 /* 读地磁（mG 整数）：成功返回 0。 */
 
 int pw_sensors_read_mag(FAR struct pw_mag_s *out);

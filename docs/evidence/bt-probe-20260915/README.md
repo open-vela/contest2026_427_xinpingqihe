@@ -13,8 +13,8 @@
 | **BT 主机栈在配置里是打开的** | `.config` 有 `CONFIG_BT_H4=y`、`CONFIG_BT_HCI_HOST=y`、`CONFIG_BT_CLASSIC=y`、`CONFIG_BT_EXT_ADV=y`、`CONFIG_BT_UART_ON_DEV_NAME="/dev/ttyHCI0"`，共 **107** 个 `CONFIG_BT*/BLUETOOTH*` 项 |
 | **但固件里几乎没有 BT 代码** | 基线固件 `nm nuttx \| grep -ci "bt_\|bluetooth"` = **2** |
 | **根因 1：`UART_BTH4` 没开** | defconfig 里 `# CONFIG_UART_BTH4 is not set`；板级 `sf32lb52_bt_initialize()` 正是 `#ifdef CONFIG_UART_BTH4` 才被调用 → `/dev/ttyHCI0` 从不注册 |
-| **根因 2：NuttX 的 BT socket 层被 gated 掉** | `net/bluetooth/CMakeLists.txt` 全部源码在 `if(CONFIG_NET_BLUETOOTH)` 内，而该符号（及其依赖 `WIRELESS_BLUETOOTH`）未开 → **一个 BT 目标文件都没编** |
-| **根因 3（决定性）：端口自己的 H4 驱动没有任何 CMakeLists 编它** | 驱动源码在 `external/zblue/zblue/port/drivers/bluetooth/hci/h4_uart.c`（用 `CONFIG_BT_UART_H4_ON_DEV_NAME`），但 `port/drivers/bluetooth/hci/` **目录下没有 CMakeLists.txt**；而 `port/sections/defines.c:543` 已经声明了 `__init___device_dts_ord_..._zephyr_bt_hci_ttyHCI0/1_ORD` → **声明了没人实现，必然链接失败** |
+| **根因 2：NuttX 的 BT socket 层被 gated 掉** | `net/bluetooth/CMakeLists.txt` 全部源码在 `if(CONFIG_NET_BLUETOOTH)` 内，而该符号（及其依赖 `WIRELESS_BLUETOOTH`）未开 → **一个 BT 目标文件都没编**。⚠️ 2026-09-15 复核更正：**走 zblue 路径并不需要这两个**——`UART_BTH4` 只依赖 `DRIVERS_BLUETOOTH`（`nuttx/drivers/serial/Kconfig:892`），数据经 `uart_bth4_register` 的 `drv->receive` 进 circbuf 被 zblue `h4.c` 读走，不经过 `net/bluetooth`；`NET_BLUETOOTH` 只在用 NuttX 原生 socket 栈时才需要 |
+| **根因 3（决定性）：端口自己的 H4 驱动没有任何 CMakeLists 编它** | 驱动源码在 `external/zblue/zblue/port/drivers/bluetooth/hci/h4.c`（`h4.c:48` `DT_DRV_COMPAT zephyr_bt_hci_ttyHCI`，其 `DEVICE_DT_DEFINE` 正好产出 `defines.c` 缺的 `__init___device_dts_ord_..._ttyHCI0/1_ORD`），但 `port/drivers/bluetooth/hci/` **目录下没有 CMakeLists.txt**；而 `port/sections/defines.c:543` 已经声明了 `__init___device_dts_ord_..._zephyr_bt_hci_ttyHCI0/1_ORD` → **声明了没人实现，必然链接失败** |
 
 **探针实测**：把 `CONFIG_UART_BTH4=y` 加进 defconfig 后，设备树会生成 `zephyr_bt_hci_ttyHCI0/ttyHCI1` 节点，但链接在最后一步报：
 
@@ -25,7 +25,7 @@ apps/external/zblue/libzblue.a(defines.c.o): undefined reference to
 
 > 注：`external/zblue/zblue/drivers/bluetooth/hci/h4.c`（上游那份，`DT_DRV_COMPAT zephyr_bt_hci_uart`）
 > 虽然存在，但它**不匹配**本端口的设备树节点（节点是 `zephyr_bt_hci_ttyHCI`）；我曾经把这一份
-> 加进 CMake 试过，仍然缺符号（因为匹配不上），已回退。真正该编的是 `port/` 下那份 `h4_uart.c`。
+> 加进 CMake 试过，仍然缺符号（因为匹配不上），已回退。**真正该编的是 `port/drivers/bluetooth/hci/h4.c`**（2026-09-15 复核：该文件有 `DT_DRV_COMPAT zephyr_bt_hci_ttyHCI`，而 `h4_uart.c` **没有** `DT_DRV_COMPAT`，它是旧的 `CONFIG_BT_H4_ENABLE` 独立 app，还引用了全仓 Kconfig 里不存在的 `CONFIG_BT_UART_H4_*`，编它会额外报错）。
 
 ---
 
@@ -33,7 +33,7 @@ apps/external/zblue/libzblue.a(defines.c.o): undefined reference to
 
 **做了**（都在工作区，**已全部回退并验证复原**）：
 1. 记录基线固件（`md5 9ed0d480…`，2,076,244 B）；
-2. 在 `nsh-ai` defconfig 追加 `CONFIG_WIRELESS_BLUETOOTH=y / CONFIG_NET_BLUETOOTH=y / CONFIG_UART_BTH4=y`；
+2. 在 `nsh-ai` defconfig 追加 `CONFIG_WIRELESS_BLUETOOTH=y / CONFIG_NET_BLUETOOTH=y / CONFIG_UART_BTH4=y`（后两者事后证明对 zblue 路径并非必需，见上表根因 2 的更正）；
 3. `rm .config` + 重新 configure + 全量构建 → 得到上表的链接失败；
 4. 试补 `h4.c` 到上游 CMake → 仍缺符号 → 回退；
 5. 回退 defconfig 与 CMake，重新 configure + 构建，**用 md5 验证固件回到基线**。

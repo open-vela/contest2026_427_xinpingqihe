@@ -350,6 +350,8 @@ static const char* kw_resume[]     = { "继续播放", "resume", NULL };
 static const char* kw_pw_pendulum[] = { "打开单摆", "单摆实验", "open pendulum", "pendulum", NULL };
 static const char* kw_pw_list[]     = { "有哪些实验", "实验列表", "list experiment", NULL };
 static const char* kw_pw_accel[]    = { "读加速度", "加速度多少", "read accel", NULL };
+static const char* kw_pw_mag[]      = { "读地磁", "地磁多少", "磁场多少", "read mag", NULL };
+static const char* kw_pw_light[]    = { "读光强", "光照多少", "环境光多少", "read light", NULL };
 static const char* kw_pw_home[]     = { "回到主屏", "回到首页", "回主菜单", "phywear home", NULL };
 static const char* kw_pw_run[]      = { "跑单摆实验", "运行单摆", "run pendulum experiment", NULL };
 
@@ -372,6 +374,8 @@ static const nl_intent_t s_intents[] = {
     { kw_pw_pendulum, "phywear_open_screen",   "{\"screen\":\"pendulum\"}", 512 },
     { kw_pw_list,     "phywear_list_experiments", "{}", 3072 },
     { kw_pw_accel,    "phywear_read_sensor",   "{\"sensor\":\"accel\"}",   512 },
+    { kw_pw_mag,      "phywear_read_sensor",   "{\"sensor\":\"mag\"}",     512 },
+    { kw_pw_light,    "phywear_read_sensor",   "{\"sensor\":\"light\"}",   512 },
     { kw_pw_home,     "phywear_open_screen",   "{\"screen\":\"root\"}",    512 },
     { NULL,         NULL,               NULL,  0    },
 };

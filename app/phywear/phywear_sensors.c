@@ -272,6 +272,74 @@ int pw_sensors_read_mag(FAR struct pw_mag_s *out)
   return 0;
 }
 
+int pw_sensors_read_mag_oneshot(FAR struct pw_mag_s *out)
+{
+#ifdef CONFIG_EXAMPLES_PHYWEAR_SIM
+  return pw_sensors_read_mag(out);
+#else
+  struct mmc5603_data_s d;
+  int fd;
+
+  if (out == NULL)
+    {
+      return -1;
+    }
+
+  fd = open("/dev/mag0", O_RDONLY);
+  if (fd < 0)
+    {
+      return -1;
+    }
+
+  if (read(fd, &d, sizeof(d)) != sizeof(d))
+    {
+      close(fd);
+      return -1;
+    }
+
+  close(fd);
+
+  out->x = (int)(d.x * MMC5603_MAG_SCALE_MG);
+  out->y = (int)(d.y * MMC5603_MAG_SCALE_MG);
+  out->z = (int)(d.z * MMC5603_MAG_SCALE_MG);
+  return 0;
+#endif
+}
+
+int pw_sensors_read_light_oneshot(FAR struct pw_light_s *out)
+{
+#ifdef CONFIG_EXAMPLES_PHYWEAR_SIM
+  return pw_sensors_read_light(out);
+#else
+  struct ltr303_data_s d;
+  int fd;
+
+  if (out == NULL)
+    {
+      return -1;
+    }
+
+  fd = open("/dev/light0", O_RDONLY);
+  if (fd < 0)
+    {
+      return -1;
+    }
+
+  if (read(fd, &d, sizeof(d)) != sizeof(d))
+    {
+      close(fd);
+      return -1;
+    }
+
+  close(fd);
+
+  out->ch0 = d.ch0;
+  out->ch1 = d.ch1;
+  out->lux = (d.ch0 > d.ch1) ? (int)((d.ch0 - d.ch1) * 0.6f) : 0;
+  return 0;
+#endif
+}
+
 int pw_sensors_read_light(FAR struct pw_light_s *out)
 {
   struct ltr303_data_s d;

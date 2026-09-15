@@ -349,7 +349,7 @@ int tool_phywear_sensor_execute(const char *input_json, char *output,
       struct pw_ai_mag_s mag;
 
       memset(&mag, 0, sizeof(mag));
-      if (pw_sensors_read_mag(&mag) < 0)
+      if (pw_sensors_read_mag_oneshot(&mag) < 0)
         {
           cJSON_AddStringToObject(r, "error", "magnetometer not available");
           pw_tool_emit(r, output, output_size, ERROR);
@@ -368,7 +368,7 @@ int tool_phywear_sensor_execute(const char *input_json, char *output,
       struct pw_ai_light_s light;
 
       memset(&light, 0, sizeof(light));
-      if (pw_sensors_read_light(&light) < 0)
+      if (pw_sensors_read_light_oneshot(&light) < 0)
         {
           cJSON_AddStringToObject(r, "error", "light sensor not available");
           pw_tool_emit(r, output, output_size, ERROR);
