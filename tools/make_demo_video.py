@@ -256,7 +256,7 @@ SLIDES = [
          lines=[
              "立创黄山派 SF32LB52 · 2026 openvela AI 硬件大赛",
              "",
-             "⚠ 本片是 v0.1 **静态素材版（样片）**，不是实拍演示：",
+             "⚠ 本片是 v0.1 静态素材版（样片），不是实拍演示：",
              "   全部画面来自 · 真机截图 · 模拟器截图 · 串口日志文字卡",
              "   片内无任何实拍动态画面，也无音轨（真人讲稿录音待补）",
          ],
@@ -548,7 +548,7 @@ SLIDES = [
              "lvgldemo benchmark：PhyWear 场景 41 FPS（render 22 / flush 0）",
              "页面级探针：原始页 fps 12 / loops 57（数值与图线两视图同值）",
              "倾角 25 · 秒表 9 · 水平仪 26 · 单摆 8~16（随是否在解算波动）",
-             "固件 2,083,708 B（flash 12.42%）· 链接期 SRAM 492,560 B / 512 KB ≈ 93.96%",
+             "固件 2,084,220 B（flash 12.42%）· SRAM 446,640 B / 512 KB（85.19%）",
          ],
          notes=[
              "EPIC 硬件加速 = 官方 PR #31/#41/#121（非本队自研）",
@@ -567,17 +567,18 @@ SLIDES = [
                  ("cmd", "$ 页面级探针（心跳行 loops/s= 与 fps=）"),
                  ("out", "原始传感器页 fps 12 / loops 57（数值与图线两视图同值）"),
                  ("out", "倾角 25 · 秒表 9 · 水平仪 26 · 单摆 8~16"),
-                 ("out", "固件 2,083,708 B · 链接期 SRAM 492,560 B / 512 KB ≈ 93.96%"),
+                 ("out", "固件 2,084,220 B · SRAM 446,640 B / 512 KB（85.19%）"),
                  ("hi",  "启动：连续 5/5、6/6 复位正常（SFBL → ABCD → NSH）"),
                  ("out", "7 分钟泡机 0 复位（麦克风/扬声器互斥修复后）"),
              ]),
          lines=[
-             "⚠ SRAM 口径如实说明：",
-             "累计新增已超用户给的「不超过 ~2 KB」额度",
+             "⚠ SRAM 口径如实说明（本片按最新真机固件口径）：",
+             "曾一度到 93.95% 并超出「不超过 ~2 KB」额度；现已解决",
          ],
          notes=[
-             "脚本 v4 口径（491,576 B / 93.76%）超约 88 B；最新固件口径（492,560 B）超约 1 KB",
-             "已向用户报告并请其定口径（是否放宽额度 / 关掉现有功能换空间）",
+             "做法：把只读符号表 g_allsyms 由 .data 改成 const 放 flash → −45,952 B",
+             "现 446,640 B（85.19%），比最初基线低约 43 KB；符号解析能力保留",
+             "注：脚本 v4 与部分旧文档仍写 492,560 B / 93.76%，已被本口径取代",
          ]),
 
     # ---------------- 第 9 段 ----------------
@@ -602,7 +603,7 @@ SLIDES = [
              "也没证明 LCPU 控制器一定会应答 HCI。",
          ],
          notes=[
-             "SRAM 已 ≈93.96%，zblue 的静态 net_buf 池大概率放不下（最大风险）",
+             "SRAM 曾是最大风险（当时 93.7%）：现已降到 85.19%，蓝牙所需 ~41 KB 有余量",
          ]),
 
     dict(seg="第 9 段", num="9 / 10", secs=10, layout="log", kind="concl",
@@ -613,7 +614,7 @@ SLIDES = [
              head="结论 · 非画面（片尾必须出现的限制 ≥3 条）",
              lines=[
                  ("out", "① 真机无网络栈 —— LLM 自由对话只在模拟器；真机走离线意图"),
-                 ("out", "② SRAM 492,560 B ≈ 93.96%；累计新增已超「~2 KB」额度"),
+                 ("out", "② SRAM 446,640 B（85.19%）：曾超「~2 KB」额度，已用 allsyms 入 flash 解决"),
                  ("out", "③ ③ 精度无转台真值 —— 只说与加速度计解算一致 ~0.5°"),
                  ("out", "④ ④ 蓝牙 no-go（三条断点见前段）"),
                  ("out", "⑤ 秒表页 fps 10 → 9（一帧代价，如实说明）"),
@@ -633,7 +634,7 @@ SLIDES = [
              "—— 不是实拍演示 ——",
              "",
              "本片缺失（待补，已如实标注）：",
-             "① 真机动态画面（开机 / 触控切视图 / 倾斜看指针盘 / 单摆真摆动）",
+             "① 真机动态画面（开机 / 触控切视图 / 指针盘 / 单摆真摆动）",
              "② 真人讲稿录音（本片无音轨）",
              "③ ⑤-1 真实晃表 3 秒 → 自动跑实验 → 可信 g 的实拍片段",
              "",
@@ -765,24 +766,31 @@ def panel(d, x0, y0, x1, y1, lines, notes, cap):
 
 
 def draw_log_card(d, x0, y0, x1, card, cap, lines, notes, y_bottom):
+    """串口日志文字卡 + 下方字幕。字号自动降档直至放得下；放不下则报错（不裁切）。"""
     f_h = font("b", 24)
-    f_m = font("m", 22)
-    f_l = font("b", 26)
-    f_n = font("r", 21)
     f_c = font("r", 18)
-
     inner_w = (x1 - x0) - 36
-    # 先算卡片高度（含折行）
-    wrapped = []
-    for kind, txt in card["lines"]:
-        wrapped.append((kind, wrap(d, txt, f_m, inner_w)))
-    ch = 30 + 40
-    for _, ws in wrapped:
-        ch += 31 * len(ws)
-    ch += 16
-    y1 = y0 + ch
-    if y1 > 470:
-        raise RuntimeError("日志卡过高（%d px），会挤掉字幕" % ch)
+    body_bottom = (y_bottom - 26) if cap else y_bottom
+
+    combos = [(22, 31, 26, 36, 21, 30), (21, 29, 25, 34, 20, 28),
+              (20, 28, 24, 32, 19, 27), (19, 26, 23, 31, 18, 26)]
+    picked = None
+    for cfs, clh, sfs, slh, nfs, nlh in combos:
+        f_m, f_l, f_n = font("m", cfs), font("b", sfs), font("r", nfs)
+        wrapped = [(k, wrap(d, t, f_m, inner_w)) for k, t in card["lines"]]
+        ch = 70 + sum(clh * len(ws) for _, ws in wrapped) + 16
+        y1 = y0 + ch
+        yy = y1 + 16
+        for ln in lines:
+            yy += len(wrap(d, ln, f_l, x1 - x0)) * slh
+        for n in notes:
+            yy += len(wrap(d, n, f_n, x1 - x0)) * nlh
+        if yy <= body_bottom and y1 <= 470:
+            picked = (f_m, f_l, f_n, clh, slh, nlh, wrapped, y1)
+            break
+    if picked is None:
+        raise RuntimeError("日志页塞不下（%s）：请精简 card/lines/notes" % card["head"])
+    f_m, f_l, f_n, clh, slh, nlh, wrapped, y1 = picked
 
     rrect(d, [x0, y0, x1, y1], 10, fill=PANEL, outline=PANEL_B, width=2)
     d.text((x0 + 18, y0 + 12), card["head"], font=f_h, fill=ACCENT)
@@ -792,23 +800,17 @@ def draw_log_card(d, x0, y0, x1, card, cap, lines, notes, y_bottom):
         color = {"hi": HI, "cmd": CMD, "out": FG, "dim": DIM}[kind]
         for w in ws:
             d.text((x0 + 18, yy), w, font=f_m, fill=color)
-            yy += 31
+            yy += clh
 
     yy = y1 + 16
-    # 素材行固定贴在底部一行，正文不得侵入
-    body_bottom = (y_bottom - 26) if cap else y_bottom
     for ln in lines:
         for w in wrap(d, ln, f_l, x1 - x0):
-            if yy + 32 > body_bottom:
-                raise RuntimeError("日志页字幕溢出：%r" % (ln,))
             d.text((x0, yy), w, font=f_l, fill=FG)
-            yy += 36
+            yy += slh
     for n in notes:
         for w in wrap(d, n, f_n, x1 - x0):
-            if yy + 30 > body_bottom:
-                raise RuntimeError("日志页注释溢出：%r" % (n,))
             d.text((x0, yy), w, font=f_n, fill=DIM)
-            yy += 30
+            yy += nlh
     if cap:
         d.text((x0, y_bottom - 22), "素材：" + cap, font=f_c, fill=(120, 128, 144))
 
@@ -845,13 +847,13 @@ def render_slide(slide):
                 y += 12
                 continue
             warn = ln.startswith("⚠")
-            for w in wrap(d, ln, font("r", 27), 720):
-                d.text((56, y), w, font=font("r", 27), fill=WARN if warn else FG)
-                y += 38
+            for w in wrap(d, ln, font("r", 26), 770):
+                d.text((56, y), w, font=font("r", 26), fill=WARN if warn else FG)
+                y += 37
         if slide["notes"]:
             y += 8
             for n in slide["notes"]:
-                for w in wrap(d, n, font("r", 20), 720):
+                for w in wrap(d, n, font("r", 20), 770):
                     d.text((56, y), w, font=font("r", 20), fill=DIM)
                     y += 28
         if imgs:
@@ -1227,6 +1229,15 @@ def main():
         print("✗ 编码不是 H.264（%s）" % info.get("codec")); ok = False
     if info.get("pix_fmt") != "yuv420p":
         print("✗ pix_fmt 不是 yuv420p（%s）" % info.get("pix_fmt")); ok = False
+
+    # 全片解码一遍：证明普通播放器能从头播到尾（-v error 有输出即为损坏）
+    r = subprocess.run([ffmpeg, "-hide_banner", "-v", "error", "-i", out, "-f", "null", "-"],
+                       capture_output=True, text=True)
+    dec_err = (r.stderr or "").strip()
+    print("全片解码  : %s" % ("✅ 无错误（%d 字节 stderr）" % len(dec_err) if not dec_err
+                             else "❌ 解码报错：\n" + dec_err[:2000]))
+    if dec_err:
+        ok = False
     print("校验      : %s" % ("✅ 全部通过" if ok else "❌ 有失败项"))
 
     if a.extract_frames is not None:
