@@ -58,6 +58,8 @@
 #include "pw_analysis.h"
 #include "phywear_sensors.h"
 #include "phywear_ui.h"
+#include "pw_ahrs.h"
+#include "pw_calib.h"
 #include "phywear_pend.h"
 #include "phywear_spec.h"
 #include "phywear_spring.h"
@@ -1051,6 +1053,151 @@ int main(int argc, FAR char *argv[])
     }
 
   /* 子命令：phywear micread [n] → 连续读麦克风并打印峰值/有效值（自检） */
+
+  /* 子命令：phywear ahrs [秒] —— 姿态解算。
+   *   不带参数：只跑合成数据自检（主机/模拟器/真机都能跑，判断实现是否退化）。
+   *   带秒数  ：自检之后再跑**实时姿态读数**：真机用 oneshot 读 IMU/磁，
+   *             用 CLOCK_MONOTONIC 算**真实 dt**（不是固定标称值），
+   *             每 0.5s 打印 roll/pitch/yaw 与零偏估计。
+   *             磁力计拿不到时自动退化为 6 轴（模拟器就没有 /dev/mag0）。
+   *   这条子命令是 ③ 惯性标尺的"真机可验证"入口，不依赖 LVGL。 */
+
+  if (argc > 1 && strcmp(argv[1], "ahrs") == 0)
+    {
+      struct pw_ahrs_s ah;
+      float err = 0.0f;
+      int   rc = pw_ahrs_selftest(&err);
+      int   secs = (argc > 2) ? atoi(argv[2]) : 0;
+
+      printf("ahrs selftest: rc=%d max_attitude_err=%.3f deg\n",
+             rc, (double)err);
+
+      if (secs <= 0)
+        {
+          return rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+        }
+
+      pw_ahrs_init(&ah);
+
+      /* 磁力计走的是 pw_sensors_open() 建好的缓存 fd（没有 oneshot 版本），
+       * 所以这条无头子命令必须自己把传感器打开一次，否则 mag 恒为 off、
+       * 偏航只能靠陀螺积分漂（实测 -2.2 dps 零偏 → ~2°/s 漂移）。 */
+
+      (void)pw_sensors_open();
+
+      {
+        struct timespec t0;
+        struct timespec t1;
+        float last_print = 0.0f;
+        int   nmag = 0;
+        int   n = 0;
+
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+
+        for (;;)
+          {
+            struct pw_imu_s imu;
+            struct pw_mag_s mag;
+            float a[3];
+            float g[3];
+            float m[3];
+            float dt;
+            int   have_mag = 0;
+
+            clock_gettime(CLOCK_MONOTONIC, &t1);
+            dt = (float)(t1.tv_sec - t0.tv_sec) +
+                 (float)(t1.tv_nsec - t0.tv_nsec) * 1e-9f;
+            t0 = t1;
+
+            if (dt <= 0.0f || dt > 0.5f)
+              {
+                dt = 0.02f;
+              }
+
+            if (pw_sensors_read_imu_oneshot(&imu) != 0)
+              {
+                usleep(20 * 1000);
+                continue;
+              }
+
+            a[0] = imu.ax / 1000.0f;
+            a[1] = imu.ay / 1000.0f;
+            a[2] = imu.az / 1000.0f;
+            g[0] = imu.gx * 1.745329e-5f;
+            g[1] = imu.gy * 1.745329e-5f;
+            g[2] = imu.gz * 1.745329e-5f;
+
+            if (pw_sensors_read_mag(&mag) == 0)
+              {
+                m[0] = (float)mag.x;
+                m[1] = (float)mag.y;
+                m[2] = (float)mag.z;
+                have_mag = 1;
+                nmag++;
+              }
+
+            pw_ahrs_update(&ah, a, g, have_mag ? m : NULL, dt);
+            n++;
+
+            last_print += dt;
+            if (last_print >= 0.5f)
+              {
+                float r;
+                float p;
+                float y;
+                float b[3];
+
+                float ar;
+                float ap;
+
+                last_print = 0.0f;
+                pw_ahrs_euler(&ah, &r, &p, &y);
+                pw_ahrs_bias(&ah, b);
+
+                /* 交叉校验：直接用加速度计解算静止倾角（不依赖 AHRS）。
+                 * 静止时两者应一致；不一致就说明滤波器或数据有问题。 */
+
+                ar = atan2f(a[1], a[2]) * 57.29578f;
+                ap = atan2f(-a[0], sqrtf(a[1] * a[1] + a[2] * a[2])) *
+                     57.29578f;
+
+                printf("ahrs t=%5.1fs n=%d mag=%s "
+                       "roll=%+7.2f pitch=%+7.2f yaw=%+7.2f "
+                       "| accel-tilt r=%+7.2f p=%+7.2f "
+                       "| bias(dps)=%+.3f %+.3f %+.3f\n",
+                       (double)((float)n * 0.02f), n,
+                       have_mag ? "on" : "off", (double)r, (double)p,
+                       (double)y, (double)ar, (double)ap,
+                       (double)(b[0] * 57.29578f),
+                       (double)(b[1] * 57.29578f),
+                       (double)(b[2] * 57.29578f));
+              }
+
+            if (n >= secs * 50)
+              {
+                break;
+              }
+
+            usleep(20 * 1000);
+          }
+
+        printf("ahrs done: %d samples, %d with mag\n", n, nmag);
+      }
+
+      pw_sensors_close();
+      return EXIT_SUCCESS;
+    }
+
+  /* 子命令：phywear calib —— 标定数学自检（一维/二维拟合、六面法、磁椭球、陀螺零偏） */
+
+  if (argc > 1 && strcmp(argv[1], "calib") == 0)
+    {
+      float err = 0.0f;
+      int   rc = pw_calib_selftest(&err);
+
+      printf("calib selftest: rc=%d worst_rel_err=%.4f\n", rc, (double)err);
+      return rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
 
   /* 模拟器专用触摸注入：phywear tap <x> <y>
    *

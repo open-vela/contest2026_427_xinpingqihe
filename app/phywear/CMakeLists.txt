@@ -58,7 +58,9 @@ if(CONFIG_EXAMPLES_PHYWEAR)
     phywear_life.c
     pw_scope.c
     pw_graph.c
-    pw_analysis.c)
+    pw_analysis.c
+    pw_ahrs.c
+    pw_calib.c)
 
   # pw_watch.c talks to the AI Agent through its public client API.  The agent
   # package publishes those headers but does not export them to other apps.
