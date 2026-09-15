@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-15 21:41:05",
- "generated_at_epoch": 1789479665,
+ "generated_at": "2026-09-15 22:05:46",
+ "generated_at_epoch": 1789481146,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 183,
-  "critical": 107,
-  "bytes": 8470262,
+  "files": 185,
+  "critical": 109,
+  "bytes": 8496742,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "1eb843c9abf630f9e30b2052ba7d846b",
-   "size": 2357,
+   "md5": "93677951fa3b3f8d8f50ff5c7a7c0f1e",
+   "size": 2375,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "f0886038c2fac3d8b6bb542520b215f5",
-   "size": 52102,
+   "md5": "1b7f4a94e80fc2d138b753140b27f249",
+   "size": 52546,
    "present": true
   },
   {
@@ -117,8 +117,8 @@
    "dst": "apps/examples/phywear/phywear_i18n_ids.inc",
    "compare": "exact",
    "critical": true,
-   "md5": "0f162aa8cd13772be982e3860afbac92",
-   "size": 6429,
+   "md5": "aee52d8fb01b9947736c65b5e9ba0989",
+   "size": 7151,
    "present": true
   },
   {
@@ -128,8 +128,30 @@
    "dst": "apps/examples/phywear/phywear_i18n_tables.inc",
    "compare": "exact",
    "critical": true,
-   "md5": "4fc27c106d04f05c93c29327e501cd1b",
-   "size": 30018,
+   "md5": "b35c9092c99df24fe761080ec6b40491",
+   "size": 32658,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/phywear_imu.c",
+   "dst": "apps/examples/phywear/phywear_imu.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "070221bf2feb6dea9ae58eb8e8d5cd0d",
+   "size": 21643,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/phywear_imu.h",
+   "dst": "apps/examples/phywear/phywear_imu.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "b4dd427c5df4f19bb8daeddb723e12c4",
+   "size": 1013,
    "present": true
   },
   {

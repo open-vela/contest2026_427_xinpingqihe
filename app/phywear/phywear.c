@@ -60,6 +60,7 @@
 #include "phywear_ui.h"
 #include "pw_ahrs.h"
 #include "pw_calib.h"
+#include "phywear_imu.h"
 #include "phywear_pend.h"
 #include "phywear_spec.h"
 #include "phywear_spring.h"
@@ -579,6 +580,10 @@ int pw_cap_open(const char *name)
   else if (strcmp(name, "mag")       == 0) { scr = pw_raw_screen(); pw_raw_goto(2); }
   else if (strcmp(name, "rawcurve")  == 0) { scr = pw_raw_screen();
                                              pw_raw_set_view(PW_RAW_VIEW_CURVE); }
+  else if (strcmp(name, "imu")       == 0) scr = pw_imu_screen();
+  else if (strcmp(name, "imubias")   == 0) { scr = pw_imu_screen(); pw_imu_goto(1); }
+  else if (strcmp(name, "imu6")      == 0) { scr = pw_imu_screen(); pw_imu_goto(2); }
+  else if (strcmp(name, "imumag")    == 0) { scr = pw_imu_screen(); pw_imu_goto(3); }
   else if (strcmp(name, "about")     == 0) scr = pw_about_screen();
   else if (strcmp(name, "ai")        == 0) scr = pw_ai_coach_screen();
   else return 0;
@@ -1235,7 +1240,7 @@ int main(int argc, FAR char *argv[])
           smp.point[0].flags = TOUCH_ID_VALID | TOUCH_POS_VALID |
                                (pass == 0 ? TOUCH_DOWN : TOUCH_UP);
           (void)write(fd, &smp, SIZEOF_TOUCH_SAMPLE_S(1));
-          usleep(pass == 0 ? 150000 : 20000);
+          usleep(pass == 0 ? 300000 : 60000);   /* 按下保持 300ms：LVGL indev 轮询周期内必然能看到按下与抬起各一次 */
         }
 
       close(fd);
