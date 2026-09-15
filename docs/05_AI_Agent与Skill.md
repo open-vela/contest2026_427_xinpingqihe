@@ -23,7 +23,7 @@
 
 | 工具 | 用途 | 关键参数 |
 |---|---|---|
-| `phywear_list_experiments` | 列出可用页面与说明（16 主页面 + 声学/原始传感器子页） | 无 |
+| `phywear_list_experiments` | 列出可用页面与说明（**21 条**：16 主页面 + 4 个子页 + `imu` 水平仪，2026-09-15 新增） | 无 |
 | `phywear_open_screen` | 把手表界面切到指定页 | `screen`（页名，来自上一个工具） |
 | `phywear_read_sensor` | 读一次传感器瞬时值 | `sensor` = `accel` / `mag` / `light` |
 | `phywear_run_experiment` | 打开实验页并采样若干秒，返回 min/max/mean | `screen`、`seconds`（1–30） |

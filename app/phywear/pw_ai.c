@@ -53,6 +53,7 @@ static const struct pw_ai_screen_s g_pw_ai_screens[] =
   { "spk",          "Speaker page: play/stop a 440 Hz test tone" },
   { "settings",     "Settings (UI language)" },
   { "about",        "About PhyWear" },
+  { "imu",          "IMU attitude: level + gyro-bias / six-face / magnetometer calibration" },
   { "ai",           "AI coach: on-device agent panel (status + quick requests + latest reply)" },
 };
 

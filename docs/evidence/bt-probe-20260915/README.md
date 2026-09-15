@@ -56,6 +56,25 @@ apps/external/zblue/libzblue.a(defines.c.o): undefined reference to
 
 ---
 
+## 3.5 补充：**"手机蓝牙共享网络"这条路在手表侧接不住**（2026-09-15 复核）
+
+用户问过"手机做网关不就是打开蓝牙共享网络吗"。**手机侧确实零开发**（系统设置里打开即可），
+但**卡点在手表侧**：
+
+| 事实 | 证据 |
+|---|---|
+| 它是**经典蓝牙 BR/EDR 的 PAN/NAP**，数据面 = BNEP over L2CAP PSM `0x000F`，之上才跑 IP | 标准 |
+| **zblue 完全没有 PAN/BNEP** | 全树只有 2 个 UUID 常量（`external/zblue/zblue/include/zephyr/bluetooth/uuid.h:5247-5248`、`.../classic/sdp.h:60`），`subsys/bluetooth/` 下无 bnep/pan/ipsp 实现 |
+| **NuttX 原生栈也没有** | `nuttx/wireless/bluetooth/` 无 bnep 文件；只有预留管道 `netdev_register.c:59`（`"bnep%d"`）与 `include/netpacket/bluetooth.h:88,228`（`BTPROTO_BNEP` / `BT_PSM_BNEP=0x000f`） |
+| openvela 框架有 PAN 服务，但**在 zblue 上编不起来** | `frameworks/connectivity/bluetooth/service/profiles/pan/panu_service.c` 依赖的 `sal_pan_interface.h` **全仓不存在**（zblue 的 SAL 没有 PAN 适配；那套是给 Bluelet 栈的） |
+| Bluelet 无源码；Fluoride 有完整 BNEP 但只当独立 app | `external/bluelet/` 只有构建文件；`external/fluoride/.../stack/bnep/` 无板级接入 |
+
+→ 手表要接住 = **从零写 PANU + BNEP + netdev/IP 绑定，估 5~15 人日**，比走自己的 **BLE GATT**（1.5~3 人日）
+大一个量级；且 **iOS 的"个人热点"经蓝牙基本只服务 Apple 设备**（自制设备通常连不上，未验证）。
+
+**路线排序（若目标只是"真机能上网/在线 LLM"）**：① 手机 App 当 GATT↔云网关（手表只用现成 GATT，+2~4 人日）→
+② USB + SLIP（`docs/09` 已规划）→ ③ 蓝牙共享网络（+5~15 人日，**不建议在截止前做**）。
+
 ## 4. 给用户的建议
 
 **建议：不在本轮排期蓝牙。** 理由：

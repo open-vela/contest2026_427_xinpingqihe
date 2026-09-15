@@ -39,6 +39,7 @@
 #include <lvgl/lvgl.h>
 
 #include "phywear_ui.h"
+#include "phywear_imu.h"
 #include "phywear_i18n.h"
 #include "pw_graph.h"
 #include "phywear_raw.h"
@@ -624,6 +625,7 @@ static lv_obj_t *ui_tool_open(void)
     { PW_STR(INCLINE_TITLE),       PW_STR(EXP_INCLINE_DESC),    pw_incline_screen },
     { PW_STR(RULER_TITLE),         PW_STR(EXP_RULER_DESC),      pw_ruler_screen },
     { PW_STR(EXP_MAG_SPEC_NAME),   PW_STR(EXP_MAG_SPEC_DESC),   pw_spec_mag_screen },
+    { PW_STR(IMU_TITLE),           PW_STR(EXP_IMU_DESC),         pw_imu_screen },
   };
   return pw_board_list(PW_STR(UI_TOOLS), PW_ACC_TOOL,
                        items, sizeof(items) / sizeof(items[0]));

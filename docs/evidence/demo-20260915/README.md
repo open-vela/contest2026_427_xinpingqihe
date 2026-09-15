@@ -69,3 +69,147 @@ python3 docs/evidence/proactive-20260915/repro-dev-chain.py
 # 标定数学自检（主机，<2s）
 bash tools/phywear/hosttest_math.sh
 ```
+
+---
+
+## 5. v0.1 样片（2026-09-15）—— **静态素材版，不是实拍**
+
+> ⚠️ **先说清楚它是什么**：`phywear-demo-v0.1.mp4` **不是实拍演示**。本机没有真实拍摄素材
+> （真机无视频输出、模拟器取帧 0.3 帧/秒、`screenrecord` 不可用，见 §1），
+> 所以 v0.1 把 **已有的真机截图 / 模拟器截图 / 串口日志文字卡** 拼成了一支带中文字幕的片子。
+> **片头（0:00–0:08）与片尾（4:45–4:55）都明确标注"v0.1 静态素材版 / 不是实拍演示"**，
+> 而且**每一帧的页脚**都常驻 `v0.1 静态素材版 · 全部画面为已有真机/模拟器截图与串口日志文字卡（非实拍动态画面）· 真机动态画面待实拍 · 无音轨`。
+> 请勿把它当成真机动态画面或成片。
+
+### 5.1 规格
+
+| 项 | 值 |
+|---|---|
+| 文件 | `docs/evidence/demo-20260915/phywear-demo-v0.1.mp4` |
+| 字节数 | **3,941,947 B（3.76 MiB）** |
+| md5 / sha256 | `90b43a4b0f18aa8fa2124e033bf5140c` / `d1606e12f9b895c058bd51939f5fc151e13352b5b72bc6cd04e1192941138042` |
+| 片长 | **295.0 s = 4:55**（≤5 分钟，与 `docs/08` v4 时间轴一致） |
+| 分辨率 / 帧率 | 1280×720（宽高均为偶数）/ 25 fps CFR |
+| 编码 | H.264 High，`yuv420p`，104 kb/s，`-movflags +faststart` |
+| 音轨 | **无**（`-an`）—— 真人讲稿录音待补，见 §5.3 |
+| 结构 | 23 张分镜 / 10 段；每帧 = 标题栏 + 素材 + 字幕栏 + 常驻诚实页脚 + 全片进度条 + 时间码 |
+| 全片解码校验 | `ffmpeg -v error -i ... -f null -` **0 字节 stderr**（可从 0:00 播到 4:55） |
+
+### 5.2 每一段用了什么素材
+
+分镜序号 / 段落 / 时间码 / 来源角标 / 版式 / 素材文件。**来源角标是片内强制绘制的**（真机截图 / 模拟器截图 / 串口日志·非画面 / 结论·非画面 / v0.1 卡），不靠观众猜。
+
+| # | 段 | 时间码 | 时长 | 片内角标 | 版式 | 素材 |
+|---|---|---|---|---|---|---|
+| 1 | 片头 | 0:00–0:08 | 8s | v0.1 静态素材版 | 大字卡 | `ui-batch2-20260915/rev-real-home.png`（真机） |
+| 2 | 第 1 段 | 0:08–0:28 | 20s | 真机截图 | 1 图 + 字幕栏 | `realboard-20260912/00_root.png` |
+| 3 | 第 2 段 | 0:28–0:41 | 13s | 真机截图 | 1 图 + 字幕栏 | `realboard-20260912/00_主页面总览.png` |
+| 4 | 第 2 段 | 0:41–0:53 | 12s | 真机截图 | 宽图 | `ui-batch2-20260915/realboard-raw-3pages.png` |
+| 5 | 第 2 段 | 0:53–1:05 | 12s | 真机截图 | 2 图 + 字幕栏 | `acoustic-20260913/{tone,mic}.png` |
+| 6 | 第 3 段 | 1:05–1:20 | 15s | 真机截图 | 1 图 + 字幕栏 | `ui-batch2-20260915/rev-real-raw-num.png` |
+| 7 | 第 3 段 | 1:20–1:35 | 15s | 真机截图 | 1 图 + 字幕栏 | `ui-batch2-20260915/rev-real-raw-curve.png` |
+| 8 | 第 4 段 | 1:35–1:50 | 15s | 真机截图 | 2 图 + 字幕栏 | `ui-batch2-20260915/realboard-{incline-dial,stopwatch-ring}.png` |
+| 9 | 第 4 段 | 1:50–2:05 | 15s | **模拟器截图** | 2 图 + 字幕栏 | `ui-batch2-20260915/sim-{incline-dial,stopwatch-ring}.png` |
+| 10 | 第 5 段 | 2:05–2:23 | 18s | 真机截图 | 1 图 + 字幕栏 | `realboard-20260912/02_pendulum.png` |
+| 11 | 第 5 段 | 2:23–2:40 | 17s | 真机截图 | 1 图 + 字幕栏 | `realboard-20260912/20_pend_p2.png` |
+| 12 | 第 6 段 | 2:40–2:55 | 15s | 真机 + 串口日志 | 1 图 + 字幕栏 | `realboard-20260912/02_pendulum.png` + 链路文字 |
+| 13 | 第 6 段 | 2:55–3:10 | 15s | 串口日志·非画面 | 日志卡 | 主动场景全链路（`proactive-20260915/README.md`） |
+| 14 | 第 6 段 | 3:10–3:25 | 15s | 串口日志·非画面 | 日志卡 | 三道有效性门 + `real-still-withheld.log` |
+| 15 | 第 7 段 | 3:25–3:34 | 9s | 真机 + 串口日志 | 1 图 + 字幕栏 | `imu-ui-20260915/real-imu-live.png` + `imu-ahrs-20260915/real-ahrs-device.log` |
+| 16 | 第 7 段 | 3:34–3:43 | 9s | 真机截图 | 2 图 + 字幕栏 | `imu-ui-20260915/real-imu-{bias,mag}.png` |
+| 17 | 第 7 段 | 3:43–3:52 | 9s | 真机截图（`[BENCH]` 角标） | 宽图 | `imu-ui-20260915/real-bench-three.png` |
+| 18 | 第 7 段 | 3:52–4:00 | 8s | **模拟器截图** | 宽图 | `imu-ui-20260915/sim-bench-three.png` |
+| 19 | 第 8 段 | 4:00–4:13 | 13s | 真机截图 | 宽图 | `realboard-20260912/00_说明数据页总览.png` |
+| 20 | 第 8 段 | 4:13–4:25 | 12s | 串口日志·非画面 | 日志卡 | 性能 / 稳定性 / SRAM 口径（`docs/06`、两份 README） |
+| 21 | 第 9 段 | 4:25–4:35 | 10s | 结论·非画面 | 日志卡 | 蓝牙 no-go 三条断点（`bt-probe-20260915/README.md`） |
+| 22 | 第 9 段 | 4:35–4:45 | 10s | 结论·非画面 | 日志卡 | 片尾已知限制 ≥3 条 |
+| 23 | 片尾 | 4:45–4:55 | 10s | v0.1 静态素材版 | 大字卡 | `ui-batch2-20260915/rev-real-home.png`（真机） |
+
+**片内引用的关键数字**（都指得到证据）：
+`g = 6.09 m/s^2 (T = 1.800 s)`（`proactive-20260915/README.md` §5 真机列）、
+`pendulum result withheld: g=3.93 out of 5.0..15.0 m/s^2`（`real-still-withheld.log`）、
+残余漏过 `7.5240 m/s^2`（同文件）、
+`roll=+178.12 pitch=+23.63 yaw=+75.63 | accel-tilt r=+178.74 p=+21.94`（`real-ahrs-device.log`）、
+零偏 `+572/−458/+687` mdps 与磁中心 `+35/−120/+60` mG（`imu-ui-20260915/README.md` §3.5）、
+LVGL benchmark 41 FPS（render 22 / flush 0）与页面级 fps 12 / 25 / 9 / 26、单摆 8~16（`docs/06`）。
+
+> ⚠️ **口径修正（本片没有照抄脚本 v4 的一处过时数字）**：`docs/08` v4 与旧文档写
+> 「SRAM 491,576 B / 93.76%，超 ~2 KB 额度 88 B」。**最新真机固件是 2,084,220 B / SRAM 446,640 B（85.19%）**
+> （`docs/01_项目描述_如实版.md:32`）：把只读符号表 `g_allsyms` 由 `.data` 改成 `const` 放进 flash，
+> **−45,952 B**，现在比最初基线还低约 43 KB，**"~2 KB 额度"超支问题已解决**，蓝牙所需的 ~41 KB 也因此有余量。
+> 本片按**最新口径**讲（片内第 20/21/22 帧明确写了这层变化）。`docs/08` v4 的 SRAM 那句建议同步更新。
+
+### 5.3 明确列出：本片**缺**什么
+
+| # | 缺的东西 | 为什么缺 | 在本片里怎么标注的 |
+|---|---|---|---|
+| 1 | **真机动态画面**（开机全过程 / 手指触控切视图 / 倾斜看指针盘逐格点亮 / 单摆真摆动 / 秒表环形进度） | 真机无视频输出，串口 dump 一帧要数秒；模拟器 0.3 帧/秒且 `screenrecord` 不可用 | 片头/片尾大字声明 + 第 3、4、5、7 帧的字幕里逐条写明"该动作待实拍" |
+| 2 | **真人讲稿录音** | 没有人声录制；本片不含任何音轨（`-an`） | 片头声明"也无音轨"、页脚常驻"无音轨"、片尾第 ② 条 |
+| 3 | **⑤-1 真实晃表片段** | 需要真人拿表晃 3 秒以上，机器替不了（摆动检测读真实 IMU） | 第 12 帧字幕写明"本片的晃表动作没有实拍素材"；第 14 帧写明"未包含真实晃表→可信 g 的实拍片段"；片尾第 ③ 条 |
+| 4 | ③ 惯性标尺精度真值 | 无转台真值 | 第 15 帧只讲"与加速度计独立解算一致 ~0.5°"，不宣称精度（照 `docs/08` §四红线） |
+| 5 | ④ 蓝牙可用性 | 探针结论就是 no-go | 第 21 帧整帧讲三条断点，明确"没有任何蓝牙能用的结论" |
+| 6 | 页面 fps 的现场录屏 | 只有已归档的实测数字，没有当场录屏 | 第 20 帧注明"数字以现场输出为准；本片引用的是已归档的真机实测值" |
+
+**同时明确：本片没有做的事** —— 没有把模拟器画面标成真机（第 9、18 帧打了醒目「模拟器截图」角标，第 18 帧还写明"模拟器数据 ≠ 真机测量"）；
+没有把日志说成画面（第 13、14、20、21、22 帧全部标注「串口日志·非画面」/「结论·非画面」）；
+没有把 `[BENCH]` 注入数据说成测量（第 17、18 帧注明"注入合成数据走完整流程，不是测量结果"）；
+没有把 EPIC 说成本队自研（第 2、19 帧写明"官方 PR #31/#41/#121"）。
+
+### 5.4 怎么重跑（可重跑脚本）
+
+脚本：`tools/make_demo_video.py`（**本仓库 `tools/` 是平铺布局，没有 `tools/phywear/` 目录**；
+`docs/08`/`make_storyboard.py` 里写的 `tools/phywear/...` 是上游 openvela 的路径习惯）。
+
+```bash
+# 1) 免 sudo 装 ffmpeg（本机 apt 要 root；imageio-ffmpeg 自带静态 ffmpeg 7.0.2）
+python3 -m pip download --no-deps --dest /tmp/ffdl imageio-ffmpeg   # 约 30 MB
+mkdir -p /tmp/fftools
+python3 -c "import zipfile,glob;zipfile.ZipFile(glob.glob('/tmp/ffdl/imageio_ffmpeg-*.whl')[0]).extractall('/tmp/fftools')"
+chmod +x /tmp/fftools/imageio_ffmpeg/binaries/ffmpeg-*
+export PHYWEAR_FFMPEG=$(ls /tmp/fftools/imageio_ffmpeg/binaries/ffmpeg-*)
+
+# 2) 只渲染 23 张分镜 PNG（快速校对中文与排版，不编码）
+python3 tools/make_demo_video.py --dry-run
+
+# 3) 出片 + 自动抽 3 帧复核
+python3 tools/make_demo_video.py --extract-frames
+```
+
+脚本的硬约束（刻意设计，别"优化"掉）：**素材缺失直接报错退出**（不静默跳过、不用占位图）；
+**文字排版溢出就报错**（不裁切）；**模拟器/日志素材漏打角标会被 `check_assets()` 拦下**；
+总时长与 `docs/08` v4 的分段时间轴**逐段比对，不一致就报错**。
+
+### 5.5 本次实际验证记录（2026-09-15）
+
+```text
+$ python3 tools/make_demo_video.py --extract-frames
+素材校验  : 21/21 全部存在
+分镜      : 23 张 / 10 段 / 295 s (4:55) / 25 fps / 1280x720
+[ffmpeg] /tmp/fftools/imageio_ffmpeg/binaries/ffmpeg-linux-x86_64-v7.0.2  (7.0.2-static)
+[encode]  完成 51.5s，7375 帧
+bytes     : 3941947 (3.76 MiB)     duration : 295.0
+width     : 1280   height : 720    codec    : h264   pix_fmt : yuv420p   fps : 25.0
+全片解码  : ✅ 无错误（0 字节 stderr）
+校验      : ✅ 全部通过
+```
+
+- **抽 3 帧人工复核**（`check-frames/check-frame-{1,2,3}.png`，t = 5 s / 150 s / 290 s）：
+  中文字幕**无方框**（用 `NotoSansCJK-Bold.ttc` index 2 / `Regular.ttc` index 7），
+  **无黑屏**，手表截图 **390×450 完整未裁**，页脚声明与进度条都在。
+- ⚠️ **一处没做到**：验收里写的"用 **ffprobe** 报时长/分辨率/编码"—— **`imageio-ffmpeg` 只随包发布 `ffmpeg`，不带 `ffprobe`**
+  （wheel 里只有 `binaries/ffmpeg-linux-x86_64-v7.0.2`，没有 ffprobe；本机也没有系统 ffprobe，
+  尝试从 johnvansickle / GitHub 取独立 ffprobe 均因网络不可达失败）。因此上表用 **`ffmpeg -i`** 读出
+  **时长 / 分辨率 / 编码 / pix_fmt / fps / 码率**（信息等价），并**追加一次全片解码**（`-f null -`，0 错误）
+  作为"普通播放器能打开并播完"的硬证据。脚本会在有 `ffprobe` 的机器上自动改用它。
+
+### 5.6 目录里新增的文件
+
+| 文件 | 说明 |
+|---|---|
+| `phywear-demo-v0.1.mp4` | **交付物**：v0.1 静态素材版样片（4:55） |
+| `slides-preview/slide-*.png` | 23 张分镜整帧 PNG（`--dry-run` 产物，人工校对用，可删） |
+| `check-frames/check-frame-{1,2,3}.png` | 从成片抽的 3 帧（t=5/150/290 s），验收证据，可删 |
+| `../../../../tools/make_demo_video.py` | 生成脚本（可重跑） |
+
+> 这些 PNG 是为了"可复核"才留下的；**仓库里若不想放二进制**，删 `slides-preview/` 与 `check-frames/` 即可，
+> 重新生成只要一条命令（§5.4）。
