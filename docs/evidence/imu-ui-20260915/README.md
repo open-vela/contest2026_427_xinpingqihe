@@ -63,6 +63,17 @@
 截图：`sim-bench-{bias,grav,mag}-solved.png`、三页并排 `sim-bench-three.png`；
 复现：`python3 docs/evidence/imu-ui-20260915/repro-bench-verify.py`（模拟器）。
 
+**真机复验（2026-09-15 晚，板子恢复后重烧 `7b0a6fd7…`）**：
+
+```
+pwshot.py run "phywear lang zh --shot=9000  imubench 1"   → 零偏 +572/-458/+687 mdps（真值 573/-458/688）
+            run "phywear lang zh --shot=15000 imubench 2"   → 零偏 +0.020/-0.015/+0.030 g、系数 0.980/1.020/0.990
+            run "phywear lang zh --shot=17000 imubench 3"   → 磁中心 +35/-120/+60 mG，平均场强 532 mG
+```
+
+真机截图：`real-bench-{bias,grav,mag}-solved.png`、三页并排 `real-bench-three.png`
+（标题均带 **[BENCH]**，表示注入数据、非测量）。
+
 ⚠️ 顺手**改正了一处单测口径错误**：`pw_calib_selftest` 里把"修正系数"当成"增益"比较，
 于是 `worst_rel_err` 里恒含 **~6.28%** 的口径差；改成与 `1/gain` 比较后为 **0.0000**
 （用注入真值对照才看出来）。
@@ -103,8 +114,7 @@ phywear tap 105 164        # 点「开始采样」，3s 后再点一次看是否
    目前只有"AHRS 与加速度计独立解算一致 ~0.5°"这一间接证据（见 `imu-ahrs-20260915`）。
 2. **成功路径已在模拟器用注入真值验通**（见 §3.5），但**真机上的成功路径仍需人实测一次**
    （按六个面摆好 + 全方向转动）——注入的是合成数据，不能替代真实传感器。
-   ⚠️ 本轮本想在真机上也跑一遍 `imubench` 抓图，但**板子从 USB 总线上掉了**（`/dev/ttyUSB0`
-   不存在、`lsusb` 无 CH34x）→ 真机截图待板子接回后补。
+   ✅ 真机上也已跑通并抓图（见 §3.5 末）—— 板子曾短暂从 USB 掉线（22:1x 重新枚举），恢复后已重烧 `7b0a6fd7…` 并复验。
 3. **SRAM 已超用户额度**：累计 +3,072 B（489,440 → 492,512），超出"不超过 ~2 KB"约 **1 KB**。
    已实测一条 **−45,752 B** 的腾挪方案（关 `CONFIG_ALLSYMS`，代价是 panic 回溯只打地址，
    见 `docs/03 §5.1`），**待用户拍板**。
