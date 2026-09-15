@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-15 23:13:36",
- "generated_at_epoch": 1789485216,
+ "generated_at": "2026-09-16 00:14:07",
+ "generated_at_epoch": 1789488847,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 187,
-  "critical": 111,
-  "bytes": 8564175,
+  "files": 189,
+  "critical": 113,
+  "bytes": 8801380,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "93677951fa3b3f8d8f50ff5c7a7c0f1e",
-   "size": 2375,
+   "md5": "ec3035a97c4ac9775953a95c83e66b07",
+   "size": 2389,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "81a873efb5797c8840c87432c126abd8",
-   "size": 53383,
+   "md5": "f31c88e1683c48d37b78e56dfd2d207a",
+   "size": 53665,
    "present": true
   },
   {
@@ -117,8 +117,8 @@
    "dst": "apps/examples/phywear/phywear_i18n_ids.inc",
    "compare": "exact",
    "critical": true,
-   "md5": "7b1315769fdbe34325285533213f099e",
-   "size": 7176,
+   "md5": "99ee4a2e7d1f97848e167ca41de6843e",
+   "size": 7519,
    "present": true
   },
   {
@@ -128,8 +128,8 @@
    "dst": "apps/examples/phywear/phywear_i18n_tables.inc",
    "compare": "exact",
    "critical": true,
-   "md5": "fe35b02b4b317b42612d85f240c33a0a",
-   "size": 32781,
+   "md5": "9a2d8f425f753c7b5db1e136f7956064",
+   "size": 34081,
    "present": true
   },
   {
@@ -139,8 +139,8 @@
    "dst": "apps/examples/phywear/phywear_imu.c",
    "compare": "exact",
    "critical": true,
-   "md5": "b0125d3ddef47898a00c0033ad653b91",
-   "size": 24832,
+   "md5": "2b614cf3398b47c14f19e00b53a44609",
+   "size": 37603,
    "present": true
   },
   {
@@ -491,8 +491,8 @@
    "dst": "apps/examples/phywear/pw_font_14.c",
    "compare": "exact",
    "critical": true,
-   "md5": "5f34d7bd33c5bae5605cc7eb313dabaf",
-   "size": 410808,
+   "md5": "e1cdd23fb32c9f7ca0a778efd38ecba3",
+   "size": 431344,
    "present": true
   },
   {
@@ -502,8 +502,8 @@
    "dst": "apps/examples/phywear/pw_font_16.c",
    "compare": "exact",
    "critical": true,
-   "md5": "eeb3a43364145974376a695286e4cf39",
-   "size": 492456,
+   "md5": "ea85843a816bbb42bc390f9587d4ef76",
+   "size": 517336,
    "present": true
   },
   {
@@ -513,8 +513,8 @@
    "dst": "apps/examples/phywear/pw_font_20.c",
    "compare": "exact",
    "critical": true,
-   "md5": "71cea3f02a7a65880cedecb0cfb054f6",
-   "size": 708035,
+   "md5": "4a43515f328d7e8e09ecb9b73dadb1c9",
+   "size": 744881,
    "present": true
   },
   {
@@ -524,8 +524,8 @@
    "dst": "apps/examples/phywear/pw_font_24.c",
    "compare": "exact",
    "critical": true,
-   "md5": "0260ffe0f41fe5608865916a533b1e33",
-   "size": 944749,
+   "md5": "c17a48c1a9f6bef308f9c30921f6edb5",
+   "size": 994002,
    "present": true
   },
   {
@@ -535,8 +535,8 @@
    "dst": "apps/examples/phywear/pw_font_28.c",
    "compare": "exact",
    "critical": true,
-   "md5": "93cfccf0dd6d8b2f2ea597324ed0089c",
-   "size": 1242955,
+   "md5": "2593f15a61561ba42cb7d1ff6cf47057",
+   "size": 1307751,
    "present": true
   },
   {
@@ -546,8 +546,8 @@
    "dst": "apps/examples/phywear/pw_graph.c",
    "compare": "exact",
    "critical": true,
-   "md5": "bcf0793dca0b43cfdbf2cd9c0c488421",
-   "size": 13716,
+   "md5": "a58932ac647c0d56b1b8d8050c463540",
+   "size": 14038,
    "present": true
   },
   {
@@ -557,8 +557,8 @@
    "dst": "apps/examples/phywear/pw_graph.h",
    "compare": "exact",
    "critical": true,
-   "md5": "a94fab77119e449138c1ada8e27d1029",
-   "size": 3302,
+   "md5": "5351c245c39265a5dbb4f73cfd75b366",
+   "size": 3850,
    "present": true
   },
   {
@@ -658,6 +658,28 @@
    "critical": true,
    "md5": "4824d51741d27852204596a3f52b50ad",
    "size": 3201,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_traj.c",
+   "dst": "apps/examples/phywear/pw_traj.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "b1bdb6a23df758554e804ec7a00dde48",
+   "size": 16489,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_traj.h",
+   "dst": "apps/examples/phywear/pw_traj.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "9909d8f47eb6246bd1364721b1b195f3",
+   "size": 8299,
    "present": true
   },
   {
@@ -986,8 +1008,8 @@
    "dst": "tools/phywear/hosttest_math.sh",
    "compare": "exact",
    "critical": true,
-   "md5": "3e918097bd1f10150fb7952c226c7950",
-   "size": 1583,
+   "md5": "ce9bf6c8b7c0e6374553f4bbeb5bea7c",
+   "size": 1621,
    "present": true
   },
   {
@@ -1052,8 +1074,8 @@
    "dst": "tools/phywear/pw_math_hosttest.c",
    "compare": "exact",
    "critical": true,
-   "md5": "f046bd466ca4956463e006c9b101e184",
-   "size": 1190,
+   "md5": "55fbb160064f27f1603e212c40bebf3a",
+   "size": 1678,
    "present": true
   },
   {

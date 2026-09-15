@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# 主机单测：把 PhyWear 的纯算法库（pw_ahrs 姿态解算 / pw_calib 标定数学）
+# 主机单测：把 PhyWear 的纯算法库（pw_ahrs 姿态解算 / pw_calib 标定数学 / pw_traj 轨迹）
 # 直接编到 PC 上跑各自的自检，不需要 NuttX、不需要板子。
 #
 # 为什么要有它：这两个库是 ③ 惯性标尺/标定的数学核心，改一版就烧一次板子
@@ -23,10 +23,12 @@ CC="${CC:-gcc}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-if [ ! -f "$APP/pw_ahrs.c" ] || [ ! -f "$APP/pw_calib.c" ]; then
-  echo "找不到算法库：$APP/pw_ahrs.c / pw_calib.c" >&2
-  exit 1
-fi
+for f in pw_ahrs.c pw_calib.c pw_traj.c; do
+  if [ ! -f "$APP/$f" ]; then
+    echo "找不到算法库：$APP/$f" >&2
+    exit 1
+  fi
+done
 
 # 桩头文件：真实构建里 nuttx/config.h 由 NuttX 生成，这两个库并不使用其中任何宏
 mkdir -p "$TMP/nuttx"
@@ -43,6 +45,7 @@ echo "[hosttest] CC=$CC"
   "$HERE/pw_math_hosttest.c" \
   "$APP/pw_ahrs.c" \
   "$APP/pw_calib.c" \
+  "$APP/pw_traj.c" \
   -lm
 
 "$TMP/pw_math_hosttest"

@@ -29,7 +29,7 @@
 
 #include "pw_graph.h"
 
-#define GRAPH_MAX   256
+#define GRAPH_MAX   PW_GRAPH_MAX_POINTS
 #define SERIES_MAX  4    /* 多序列上限（roadmap §7.3 第 1 条） */
 
 struct pw_series_s
@@ -487,6 +487,23 @@ void pw_graph_set_data(struct pw_graph_s *g, FAR const float *x,
   pw_graph_begin(g);
   pw_graph_add_series(g, x, y, n, c);
   pw_graph_end(g);
+}
+
+void pw_graph_set_range(struct pw_graph_s *g, float xmin, float xmax,
+                        float ymin, float ymax)
+{
+  if (g == NULL || xmax <= xmin || ymax <= ymin)
+    {
+      return;
+    }
+
+  g->auto_fit = 0;
+  g->xmin = xmin;
+  g->xmax = xmax;
+  g->ymin = ymin;
+  g->ymax = ymax;
+
+  g_render(g);
 }
 
 void pw_graph_set_auto(struct pw_graph_s *g, int on)

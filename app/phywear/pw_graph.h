@@ -39,6 +39,11 @@
 #define PW_GRAPH_AXIS_X  0
 #define PW_GRAPH_AXIS_Y  1
 
+/* 每条序列的最大点数（调用方按此准备 x/y 数组）。
+ * 调用方要用到上限的场合（轨迹页缓冲）必须用这个宏，别自己写 256。 */
+
+#define PW_GRAPH_MAX_POINTS 256
+
 struct pw_graph_s;
 
 /* dots=1 散点模式，否则折线模式 */
@@ -64,6 +69,13 @@ int  pw_graph_add_series(struct pw_graph_s *g, FAR const float *x,
 void pw_graph_end(struct pw_graph_s *g);
 
 void pw_graph_set_auto(struct pw_graph_s *g, int on);
+
+/* 直接指定视图窗口（并关掉 auto_fit）。用于"标尺必须固定"的图：
+ * 例如轨迹页的 XY 平面——若每帧自动 fit，图形会随数据呼吸，
+ * 位移大小就看不出比例了。 */
+
+void pw_graph_set_range(struct pw_graph_s *g, float xmin, float xmax,
+                        float ymin, float ymax);
 void pw_graph_fit(struct pw_graph_s *g);
 void pw_graph_set_grid(struct pw_graph_s *g, int on);
 void pw_graph_zoom(struct pw_graph_s *g, int axis, float factor);

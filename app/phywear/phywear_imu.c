@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * ③ 惯性标尺 UI：水平仪/姿态 + 标定向导（4 页横滑）。
+ * ③ 惯性标尺 UI：水平仪/姿态 + 标定向导 + 轨迹（5 页横滑）。
  *
  * 设计取舍（都为了不撞 SF32LB52 的两个硬约束）：
  *   - **不用任何旋转控件**：水平仪的小球靠"改坐标"实现（lv_obj_set_pos），
@@ -29,12 +29,14 @@
 #include "phywear_ui.h"
 #include "pw_ahrs.h"
 #include "pw_calib.h"
+#include "pw_graph.h"
+#include "pw_traj.h"
 
 /****************************************************************************
  * Private Definitions
  ****************************************************************************/
 
-#define IMU_PAGES        4
+#define IMU_PAGES        5
 #define IMU_PAGE_W       390
 #define IMU_PAGE_H       342
 #define IMU_TICK_MS      20        /* 50 Hz，与单摆页一致 */
@@ -43,6 +45,18 @@
 #define BIAS_STILL_STD   0.02f     /* rad/s ≈1.1 dps，超过就判"没静止" */
 #define SIX_FACE_N       50        /* 每个面取 1s */
 #define MAG_MIN_N        200       /* 至少 200 个样本才拟合椭球 */
+
+/* page 4 轨迹：默认视图 ±30 cm，超出 90% 就整档翻倍（不做逐帧自适应，
+ * 否则"标尺"会随数据呼吸，位移比例就读不出来了） */
+
+#define TJ_RANGE0        0.30f
+#define TJ_DRAW_DIV      5         /* 50 Hz 采样 / 5 = 10 Hz 重绘 */
+#define TJ_ALIGN_N       150       /* 开页后 3 s 姿态对准：这段时间只收敛姿态、不积分。
+                                    * 两个真机实测依据：
+                                    *   ① 不这么做时对准瞬态会被积成米级位移（4 s 内 X 走 2.4 m、Z 走 4.8 m）；
+                                    *   ② AHRS 的陀螺零偏估计要 ~4 s 才收敛（0.2 → 2.48 dps），
+                                    *      3 s 时已降到门限内，之后 ZUPT 能把静止稳住。 */
+#define TJ_BENCH_A       2.0f      /* bench 推手峰值 m/s²（整周期 0.6 s → 每次推 ~11.5 cm） */
 
 #define LVL_CARD_W       190
 #define LVL_CARD_H       150
@@ -93,7 +107,27 @@ struct imu_ui_s
   lv_obj_t *mag_res[3];
   lv_obj_t *mag_stat;
 
+  /* page 4 轨迹（相对位移） */
+
+  struct pw_graph_s *tj_graph;
+  lv_obj_t *tj_val[3];
+  lv_obj_t *tj_vel;
+  lv_obj_t *tj_time;
+  lv_obj_t *tj_stat;
+  lv_obj_t *tj_scale;
+
   /* 状态 */
+
+  /* 轨迹用**堆**（与 pw_graph 自己的画布同一策略）：本机静态 SRAM 很紧，
+   * 页面级缓冲不该进 BSS。本页只多一个指针的静态开销。 */
+
+  struct pw_traj_s *traj;
+  float  *tjx;
+  float  *tjy;
+  int     tj_n;
+  int     tj_tick;
+  int     tj_align;            /* >0 = 姿态对准中（只收敛姿态，不积分） */
+  float   tj_range;
 
   struct pw_ahrs_s       ahrs;
   struct pw_calib_bias_s bias_acc;
@@ -243,6 +277,11 @@ static void imu_scroll_end_cb(lv_event_t *e)
 }
 
 /* 水平仪小球：跟着倾角走（正 roll 向下、正 pitch 向右），不旋转对象 */
+
+/* 轨迹页的刷新/落点在 tick 之后才定义，这里先声明（本文件内静态） */
+
+static void imu_traj_labels(void);
+static void imu_traj_push(float x, float y);
 
 static void imu_level_dot(float roll, float pitch)
 {
@@ -491,6 +530,38 @@ static void imu_tick_cb(lv_timer_t *timer)
       imu_bench_data(a, g, m, (g_i.idx == 2) ? g_i.six_face : -1);
       have_mag = 1;
       g_i.mag_seen = 1;
+
+      if (g_i.idx == 4)
+        {
+          /* 轨迹页注入：合成"推 0.6 s → 静 1.4 s"的循环（竖轴仍 1 g）。
+           * 必须带静止段：ZUPT 才有机会把速度钉回 0 —— 若一直"在动"，
+           * 纯惯性积分几十秒就会漂到公里级（第一版注入正是如此，屏幕上是 5.5 km，
+           * 那是死算的教科书结果，不是页面 bug）。
+           * 真机这一页靠人推；注入只为截图/回归，标题上的 [BENCH] 标明不是测量。 */
+
+          int k = (int)(g_imu_bench_n % 100);      /* 100 拍 = 2.0 s */
+
+          if (k < 30)                              /* 30 拍 = 0.6 s：整周期正弦推手 */
+            {
+              float ph = 6.2831853f * (float)k / 30.0f;
+
+              a[0] = TJ_BENCH_A * sinf(ph) / 9.80665f;
+              a[1] = 0.0f;
+              a[2] = 1.0f;
+              g[0] = 0.0f;
+              g[1] = 0.3f * sinf(ph);              /* 带转动的推，像真推手 */
+              g[2] = 0.0f;
+            }
+          else                                     /* 70 拍 = 1.4 s：真静止 → ZUPT */
+            {
+              a[0] = 0.0f;
+              a[1] = 0.0f;
+              a[2] = 1.0f;
+              g[0] = 0.0f;
+              g[1] = 0.0f;
+              g[2] = 0.0f;
+            }
+        }
     }
   else
     {
@@ -586,6 +657,135 @@ static void imu_tick_cb(lv_timer_t *timer)
             if (g_imu_bench && g_i.mag_acc.n >= 400)
               {
                 imu_mag_cb(NULL);         /* bench：自动停 + 拟合 */
+              }
+          }
+        break;
+
+      case 4:
+        if (g_i.traj == NULL)
+          {
+            break;
+          }
+
+        /* 姿态是"去重力"必需的（roll/pitch 决定重力方向；绕竖轴转不影响），
+         * 所以本页也跑 AHRS，保证从别的页直接滑过来时姿态已收敛。 */
+
+        if (!g_i.ahrs_inited)
+          {
+            pw_ahrs_init(&g_i.ahrs);
+            g_i.ahrs_inited = 1;
+          }
+
+        pw_ahrs_update(&g_i.ahrs, a, g, have_mag ? m : NULL, dt);
+
+        /* 用**零偏改正后**的角速度喂 ZUPT 判据：真机实测未标定陀螺零偏约 2.9 dps，
+         * 而"静止"门限是 3 dps —— 拿原始值会让状态在静止/运动之间来回抖，
+         * 每抖一次就把零偏与刻度误差积进位置（实测 9 s 漂 1.3 m）。
+         * AHRS 自己的 bias 就在收敛估计这个零偏，直接用它，不另起一套。 */
+
+        {
+          float gb[3];
+          int   k;
+
+          for (k = 0; k < 3; k++)
+            {
+              gb[k] = g[k] - g_i.ahrs.bias[k];
+            }
+
+          /* 姿态对准期只收敛姿态、不积分（见 TJ_ALIGN_N） */
+
+          if (g_i.tj_align > 0)
+            {
+              g_i.tj_align--;
+
+              if ((g_i.tj_align % 25) == 0)
+                {
+                  float bg = sqrtf(g_i.ahrs.bias[0] * g_i.ahrs.bias[0] +
+                                   g_i.ahrs.bias[1] * g_i.ahrs.bias[1] +
+                                   g_i.ahrs.bias[2] * g_i.ahrs.bias[2]);
+
+                  printf("[TRAJ] aligning n=%d bias=%.2f dps\n",
+                         g_i.ahrs.n, (double)(bg * 57.29578f));
+                }
+
+              if (g_i.tj_align == 0)
+                {
+                  pw_traj_init(g_i.traj, 0.0f);      /* 对准结束：从这一刻起算轨迹 */
+                  g_i.tj_n = 0;
+                  g_i.tj_tick = 0;
+                  g_i.tj_range = TJ_RANGE0;
+                  pw_graph_set_data(g_i.tj_graph, g_i.tjx, g_i.tjy, 0);
+                }
+              else
+                {
+                  if (g_i.tj_align == TJ_ALIGN_N - 1)
+                    {
+                      lv_label_set_text(g_i.tj_stat, PW_STR(IMU_TJ_ALIGN));
+                    }
+                  break;
+                }
+            }
+
+          pw_traj_update(g_i.traj, a, gb, g_i.ahrs.q, dt);
+        }
+
+        g_i.tj_tick++;
+
+        if (g_i.tj_tick >= TJ_DRAW_DIV)
+          {
+            float xyz[3];
+
+            g_i.tj_tick = 0;
+            pw_traj_pos(g_i.traj, xyz);
+
+            if (!pw_traj_is_still(g_i.traj))
+              {
+                imu_traj_push(xyz[0], xyz[1]);
+
+                /* 超出视图 90% 就整档翻倍（0.3→0.6→1.2 m），保证推远了还看得见 */
+
+                if (fabsf(xyz[0]) > 0.9f * g_i.tj_range ||
+                    fabsf(xyz[1]) > 0.9f * g_i.tj_range)
+                  {
+                    g_i.tj_range *= 2.0f;
+                    pw_graph_set_range(g_i.tj_graph, -g_i.tj_range,
+                                       g_i.tj_range, -g_i.tj_range,
+                                       g_i.tj_range);
+                  }
+              }
+
+            pw_graph_set_data(g_i.tj_graph, g_i.tjx, g_i.tjy, g_i.tj_n);
+            imu_traj_labels();
+
+            /* 每 5 次重绘（≈0.5 s）往控制台打一行，内容与屏幕一致。
+             * 为什么要有它：真机没有 /dev/fb0、也不能拍照时，靠这行就能把
+             * "手推了多远"变成可复核的数字（真值测量协议 Experiment A 用它）。
+             * 频率用已有的 tj_tick 决定，不新增任何状态。 */
+
+            /* 每 25 拍（0.5 s）一行。判据用 traj->n 而不是 tj_tick：
+             * tj_tick 在上面已被清零，用它判断会永远不成立（踩过）。 */
+
+            if ((g_i.traj->n % (TJ_DRAW_DIV * 5)) == 0)
+              {
+                float amag = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+                float wmag = sqrtf(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+
+                float bg = sqrtf(g_i.ahrs.bias[0] * g_i.ahrs.bias[0] +
+                                 g_i.ahrs.bias[1] * g_i.ahrs.bias[1] +
+                                 g_i.ahrs.bias[2] * g_i.ahrs.bias[2]);
+
+                printf("[TRAJ] t=%.2f x=%+.1f y=%+.1f z=%+.1f cm v=%.1f cm/s "
+                       "still=%d n=%d |a|=%.3fg |w|=%.1fdps bad=%d "
+                       "bias=%.2fdps\n",
+                       (double)pw_traj_time(g_i.traj),
+                       (double)(xyz[0] * 100.0f), (double)(xyz[1] * 100.0f),
+                       (double)(xyz[2] * 100.0f),
+                       (double)(sqrtf(g_i.traj->v[0] * g_i.traj->v[0] +
+                                      g_i.traj->v[1] * g_i.traj->v[1] +
+                                      g_i.traj->v[2] * g_i.traj->v[2]) * 100.0f),
+                       pw_traj_is_still(g_i.traj), g_i.traj->n,
+                       (double)amag, (double)(wmag * 57.29578f),
+                       g_i.traj->n_bad, (double)(bg * 57.29578f));
               }
           }
         break;
@@ -784,6 +984,164 @@ static void imu_build_mag(void)
   lv_obj_set_pos(g_i.mag_stat, 20, 268);
 }
 
+/* ---- page 4：轨迹（相对位移）----
+ * 画的是**世界系水平面内的相对位移**（X-Y），Z 只给数值不上图（竖向误差最大，
+ * 上图容易让人以为"高度也准"）。留痕只在运动时落点：静止段 ZUPT 已把位置钉住，
+ * 再落点只是同一处堆点。 */
+
+static void imu_traj_labels(void)
+{
+  /* PW_STR() 是 token-paste 宏，参数里不能带下标表达式，
+   * 所以这里用运行时 pw_str(id)：id 必须是编译期常量枚举。 */
+
+  static const int axis_id[3] =
+  {
+    PW_STR_IMU_TJ_X, PW_STR_IMU_TJ_Y, PW_STR_IMU_TJ_Z
+  };
+
+  float xyz[3];
+  int   i;
+
+  if (g_i.traj == NULL)
+    {
+      return;
+    }
+
+  pw_traj_pos(g_i.traj, xyz);
+
+  for (i = 0; i < 3; i++)
+    {
+      lv_label_set_text_fmt(g_i.tj_val[i], pw_str(axis_id[i]),
+                            (double)(xyz[i] * 100.0f));
+    }
+
+  lv_label_set_text_fmt(g_i.tj_vel, PW_STR(IMU_FMT_TJ_V),
+                        (double)(sqrtf(g_i.traj->v[0] * g_i.traj->v[0] +
+                                       g_i.traj->v[1] * g_i.traj->v[1] +
+                                       g_i.traj->v[2] * g_i.traj->v[2]) *
+                                 100.0f));
+  lv_label_set_text_fmt(g_i.tj_time, PW_STR(IMU_FMT_TJ_T),
+                        (double)pw_traj_time(g_i.traj));
+  lv_label_set_text_fmt(g_i.tj_scale, PW_STR(IMU_FMT_TJ_SCALE),
+                        (double)(g_i.tj_range * 50.0f));
+
+  if (pw_traj_is_still(g_i.traj))
+    {
+      lv_label_set_text(g_i.tj_stat, PW_STR(IMU_TJ_STILL));
+      lv_obj_set_style_text_color(g_i.tj_stat, PW_COL_DIM, 0);
+    }
+  else
+    {
+      lv_label_set_text(g_i.tj_stat, PW_STR(IMU_TJ_MOVING));
+      lv_obj_set_style_text_color(g_i.tj_stat, PW_ACC_RAW, 0);
+    }
+}
+
+static void imu_traj_push(float x, float y)
+{
+  if (g_i.tj_n >= PW_GRAPH_MAX_POINTS)
+    {
+      memmove(g_i.tjx, g_i.tjx + 1, sizeof(float) * (PW_GRAPH_MAX_POINTS - 1));
+      memmove(g_i.tjy, g_i.tjy + 1, sizeof(float) * (PW_GRAPH_MAX_POINTS - 1));
+      g_i.tj_n = PW_GRAPH_MAX_POINTS - 1;
+    }
+
+  g_i.tjx[g_i.tj_n] = x;
+  g_i.tjy[g_i.tj_n] = y;
+  g_i.tj_n++;
+}
+
+static void imu_traj_reset_cb(lv_event_t *e)
+{
+  (void)e;
+
+  if (g_i.traj == NULL)
+    {
+      return;
+    }
+
+  pw_traj_init(g_i.traj, 0.0f);      /* 只归零，不修漂移（界面已如实标注） */
+  g_i.tj_n = 0;
+  g_i.tj_tick = 0;
+  g_i.tj_range = TJ_RANGE0;
+
+  pw_graph_set_data(g_i.tj_graph, g_i.tjx, g_i.tjy, 0);
+  imu_traj_labels();
+}
+
+static void imu_build_traj(void)
+{
+  lv_obj_t *pg = imu_page_new(4);
+  lv_obj_t *lab;
+  int i;
+
+  lab = pw_label_new(pg, PW_STR(IMU_TRAJ), PW_FNT_LARGE, PW_ACC_RAW);
+  lv_obj_set_pos(lab, 20, 2);
+
+  imu_button(pg, 282, 0, 96, 44, imu_traj_reset_cb,
+             PW_STR(IMU_TJ_BTN_RESET), NULL);
+
+  /* 页面级缓冲全部走堆：失败就整页降级（显示提示），不留半截界面 */
+
+  if (g_i.traj == NULL)
+    {
+      g_i.traj = lv_malloc_zeroed(sizeof(struct pw_traj_s));
+      g_i.tjx = lv_malloc(sizeof(float) * PW_GRAPH_MAX_POINTS);
+      g_i.tjy = lv_malloc(sizeof(float) * PW_GRAPH_MAX_POINTS);
+    }
+
+  if (g_i.traj == NULL || g_i.tjx == NULL || g_i.tjy == NULL)
+    {
+      lab = pw_label_new(pg, PW_STR(IMU_TJ_NOMEM), PW_FNT_BODY, PW_COL_FAINT);
+      lv_obj_set_pos(lab, 20, 60);
+      return;
+    }
+
+  pw_traj_init(g_i.traj, 0.0f);
+  g_i.tj_n = 0;
+  g_i.tj_tick = 0;
+  g_i.tj_align = TJ_ALIGN_N;
+  g_i.tj_range = TJ_RANGE0;
+
+  g_i.tj_graph = pw_graph_create(pg, 236, 236, PW_ACC_RAW, PW_COL_CARD, 0);
+  if (g_i.tj_graph == NULL)
+    {
+      lab = pw_label_new(pg, PW_STR(IMU_TJ_NOMEM), PW_FNT_BODY, PW_COL_FAINT);
+      lv_obj_set_pos(lab, 20, 60);
+      return;
+    }
+
+  lv_obj_set_pos(pw_graph_obj(g_i.tj_graph), 10, 46);
+  pw_graph_set_range(g_i.tj_graph, -TJ_RANGE0, TJ_RANGE0,
+                     -TJ_RANGE0, TJ_RANGE0);
+
+  for (i = 0; i < 3; i++)
+    {
+      g_i.tj_val[i] = pw_label_new(pg, "", PW_FNT_SMALL, PW_COL_TEXT);
+      lv_obj_set_pos(g_i.tj_val[i], 252, 56 + i * 24);
+    }
+
+  g_i.tj_vel = pw_label_new(pg, "", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(g_i.tj_vel, 252, 140);
+
+  g_i.tj_time = pw_label_new(pg, "", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(g_i.tj_time, 252, 162);
+
+  g_i.tj_stat = pw_label_new(pg, "", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(g_i.tj_stat, 252, 192);
+
+  g_i.tj_scale = pw_label_new(pg, "", PW_FNT_BODY, PW_COL_FAINT);
+  lv_obj_set_pos(g_i.tj_scale, 252, 216);
+
+  lab = pw_label_new(pg, PW_STR(IMU_TJ_NOTE), PW_FNT_BODY, PW_COL_FAINT);
+  lv_obj_set_pos(lab, 14, 290);
+
+  lab = pw_label_new(pg, PW_STR(IMU_HINT_TRAJ), PW_FNT_BODY, PW_COL_FAINT);
+  lv_obj_set_pos(lab, 14, 312);
+
+  imu_traj_labels();
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -828,6 +1186,7 @@ lv_obj_t *pw_imu_screen(void)
   imu_build_bias();
   imu_build_grav();
   imu_build_mag();
+  imu_build_traj();
 
   btn = pw_card_new(g_i.scr, 64, 44, PW_COL_CARD);
   lv_obj_set_pos(btn, 4, 396);

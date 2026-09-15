@@ -590,6 +590,10 @@ int pw_cap_open(const char *name)
   else if (strcmp(name, "imubias")   == 0) { scr = pw_imu_screen(); pw_imu_goto(1); }
   else if (strcmp(name, "imu6")      == 0) { scr = pw_imu_screen(); pw_imu_goto(2); }
   else if (strcmp(name, "imumag")    == 0) { scr = pw_imu_screen(); pw_imu_goto(3); }
+  else if (strcmp(name, "imutraj")   == 0) { scr = pw_imu_screen(); pw_imu_goto(4); }
+  else if (strcmp(name, "imutrajbench") == 0) { pw_imu_bench(1);
+                                             scr = pw_imu_screen();
+                                             pw_imu_goto(4); }
   else if (strcmp(name, "about")     == 0) scr = pw_about_screen();
   else if (strcmp(name, "ai")        == 0) scr = pw_ai_coach_screen();
   else return 0;

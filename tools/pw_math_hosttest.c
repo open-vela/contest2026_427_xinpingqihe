@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * 主机侧单测入口：把 pw_ahrs / pw_calib 两个纯算法库编到 PC 上跑自检。
+ * 主机侧单测入口：把 pw_ahrs / pw_calib / pw_traj 三个纯算法库编到 PC 上跑自检。
  * 这两个文件不依赖 NuttX/LVGL（只 include <nuttx/config.h>，主机用桩头文件），
  * 所以算法改动可以在 PC 上秒级迭代，不必每次烧板子。
  *
@@ -14,6 +14,7 @@
 
 #include "pw_ahrs.h"
 #include "pw_calib.h"
+#include "pw_traj.h"
 
 int main(void)
 {
@@ -33,6 +34,19 @@ int main(void)
   err = -1.0f;
   rc = pw_calib_selftest(&err);
   printf("pw_calib_selftest rc=%d  worst_rel_err=%.4f            %s\n",
+         rc, (double)err, rc == 0 ? "OK" : "FAIL");
+  if (rc != 0)
+    {
+      bad++;
+    }
+
+  /* 轨迹：整周期正弦推手 20 cm + 1 mg 零偏 + 静止抗噪三关。
+   * 这一项最容易被"看起来像能跑"糊过去（naive ZUPT 会把推力当静止、
+   * 位移恒为 0 却不报错），所以必须进常规单测。 */
+
+  err = -1.0f;
+  rc = pw_traj_selftest(&err);
+  printf("pw_traj_selftest  rc=%d  max_disp_err=%.4f m          %s\n",
          rc, (double)err, rc == 0 ? "OK" : "FAIL");
   if (rc != 0)
     {
