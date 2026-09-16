@@ -150,6 +150,10 @@ void pw_press_style(lv_obj_t *obj);
 /* 装饰性 obj（图标块/色条/网格线）取消 CLICKABLE：否则会把按压状态从卡片上抢走 */
 void pw_deco(lv_obj_t *obj);
 
+/* 章节条：3px 强调色小竖条（放在页头/卡片标题左侧，配合标题标签用，v2 观感）。
+ * 纯色块 + 半径 2 + 无边框，不参与触摸。 */
+void pw_section_bar(lv_obj_t *parent, lv_color_t accent, int x, int y);
+
 /* 标签快捷创建 */
 
 lv_obj_t *pw_label_new(lv_obj_t *parent, const char *text,

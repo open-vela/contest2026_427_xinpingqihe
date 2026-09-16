@@ -454,6 +454,19 @@ void pw_press_style(lv_obj_t *obj)
 
 /* 装饰性 obj 不参与触摸。lv_obj_create() 默认带 CLICKABLE，
  * 图标块/色条/网格线会把按压状态从卡片上"抢走"——表现为"按在图标上没反应"。 */
+void pw_section_bar(lv_obj_t *parent, lv_color_t accent, int x, int y)
+{
+  lv_obj_t *bar = lv_obj_create(parent);
+
+  lv_obj_set_size(bar, 3, 16);
+  lv_obj_set_pos(bar, x, y);
+  lv_obj_set_style_bg_color(bar, accent, 0);
+  lv_obj_set_style_radius(bar, 2, 0);
+  lv_obj_set_style_border_width(bar, 0, 0);
+  lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+  pw_deco(bar);
+}
+
 void pw_deco(lv_obj_t *obj)
 {
   if (obj != NULL)

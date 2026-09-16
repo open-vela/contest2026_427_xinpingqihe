@@ -323,8 +323,9 @@ static void life_build_page_meter(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, L_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(LIFE_LOUDNESS), PW_FNT_MED, L_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(LIFE_RMS_DBFS), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 160, 8);
@@ -361,8 +362,9 @@ static void life_build_page_history(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, L_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(LIFE_HISTORY), PW_FNT_MED, L_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(LIFE_LOUDNESS_TIME), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 160, 8);
@@ -398,8 +400,9 @@ static void life_build_page_help(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, L_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(HELP), PW_FNT_MED, L_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   card = pw_card_new(pg, 354, 280, PW_COL_CARD);
   lv_obj_set_pos(card, 18, 40);

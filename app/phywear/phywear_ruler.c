@@ -222,6 +222,20 @@ static void ruler_recount(void)
   lv_label_set_text_fmt(g_r.cnt_lab, "%u", count);
   lv_label_set_text_fmt(g_r.cnt2_lab, PW_STR(RULER_PEAKS_FMT), count);
 
+  /* D1 状态脉冲：**只在计数增加**（真的检测到新磁峰）时闪一次。
+   * ruler_recount() 每次采样都会被调用，若无条件脉冲就变成常驻动画 —— 违反"单次/不循环"。 */
+
+  {
+    static unsigned s_last_count;
+
+    if (count > s_last_count)
+      {
+        pw_motion_pulse_opa(g_r.cnt_lab, 200);
+      }
+
+    s_last_count = count;
+  }
+
   if (g_r.idx == 1 && g_r.n > 1)
     {
       pw_graph_set_data(g_r.graph, g_r.tbuf, g_r.sbuf, g_r.n);
@@ -343,8 +357,9 @@ static void ruler_build_page_count(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, R_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(RULER_COUNT), PW_FNT_MED, R_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(RULER_PEAK_DESC),
                      PW_FNT_BODY, PW_COL_FAINT);
@@ -405,8 +420,9 @@ static void ruler_build_page_field(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, R_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(RULER_FIELD), PW_FNT_MED, R_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   g_r.cnt2_lab = pw_label_new(pg, PW_STR(ZERO_PEAKS), PW_FNT_MED, PW_COL_TEXT);
   lv_obj_set_pos(g_r.cnt2_lab, 120, 4);
@@ -442,8 +458,9 @@ static void ruler_build_page_help(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, R_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(HELP), PW_FNT_MED, R_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   card = pw_card_new(pg, 354, 280, PW_COL_CARD);
   lv_obj_set_pos(card, 18, 40);

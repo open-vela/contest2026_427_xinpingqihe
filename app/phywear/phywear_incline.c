@@ -473,8 +473,9 @@ static void inc_build_page_angle(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, I_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(INCLINE_ANGLE), PW_FNT_MED, I_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(INCLINE_FORMULA),
                      PW_FNT_BODY, PW_COL_FAINT);
@@ -544,8 +545,9 @@ static void inc_build_page_history(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, I_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(INCLINE_HISTORY), PW_FNT_MED, I_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(INCLINE_ANGLE_TIME), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 160, 8);
@@ -580,8 +582,9 @@ static void inc_build_page_help(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, I_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(HELP), PW_FNT_MED, I_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   card = pw_card_new(pg, 354, 280, PW_COL_CARD);
   lv_obj_set_pos(card, 18, 40);

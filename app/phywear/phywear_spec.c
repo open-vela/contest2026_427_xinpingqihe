@@ -751,8 +751,9 @@ static void spec_build_page_spectrum(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, S_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(SPEC_TITLE), PW_FNT_MED, S_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   lab = pw_label_new(pg, PW_STR(SPEC_MAG_NORM),
                      PW_FNT_BODY, PW_COL_FAINT);
@@ -827,8 +828,9 @@ static void spec_build_page_wave(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, S_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(SPEC_WAVEFORM), PW_FNT_MED, S_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   if (g_s.kind == SPEC_KIND_ACC)
     {
@@ -906,8 +908,9 @@ static void spec_build_page_help(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
+  pw_section_bar(pg, S_ACC, 20, 6);
   lab = pw_label_new(pg, PW_STR(HELP), PW_FNT_MED, S_ACC);
-  lv_obj_set_pos(lab, 20, 4);
+  lv_obj_set_pos(lab, 30, 4);
 
   card = pw_card_new(pg, 354, 280, PW_COL_CARD);
   lv_obj_set_pos(card, 18, 40);
