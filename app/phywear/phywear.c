@@ -75,6 +75,9 @@
 #include "phywear_sensors.h"
 #include "phywear_ui.h"
 #include "pw_btprobe.h"
+#if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
+#  include <demos/benchmark/lv_demo_benchmark.h>
+#endif
 #include "pw_motion.h"
 #include "pw_ahrs.h"
 #include "pw_calib.h"
@@ -777,7 +780,8 @@ int main(int argc, FAR char *argv[])
   int  time_bench_kind = 0;   /* 0=motion 1=light 2=acoustic */
   bool open_raw = false;      /* 调试：直接打开 Raw Sensors 页 */
   bool demo_mode = false;     /* 自动演示：模拟点击验证 / 录屏 */
-  const char *cap_screen = NULL;  /* 截图专用：phywear cap <name> 打开指定屏并驻留 */
+  const char *cap_screen = NULL;
+  bool lvbench_mode = false;     /* phywear lvbench：跑 LVGL 官方 benchmark */  /* 截图专用：phywear cap <name> 打开指定屏并驻留 */
   bool shot_once = false;         /* --shot[=ms]: dump one console screenshot */
   bool shot_sweep = false;        /* --sweep[=ms]: dump the 16 main pages */
   bool shot_p2 = false;           /* --p2[=ms]: dump the 10 bench pages */
@@ -941,6 +945,19 @@ int main(int argc, FAR char *argv[])
     }
 
   /* 动效计时：查表 vs 解析式（P1-2 的"计算节省量"必须实测） */
+
+  /* LVGL 官方 benchmark 跑分：`phywear lvbench`（跑完自动在屏幕与串口给汇总表） */
+
+  if (argc > 1 && strcmp(argv[1], "lvbench") == 0)
+    {
+#if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
+      lvbench_mode = true;
+      argc = 1;
+#else
+      printf("lvbench: 本固件未编入 LVGL benchmark（CONFIG_LV_USE_DEMO_BENCHMARK=n）\n");
+      return 0;
+#endif
+    }
 
   if (argc > 1 && strcmp(argv[1], "motionbench") == 0)
     {
@@ -1504,6 +1521,18 @@ int main(int argc, FAR char *argv[])
 
   /* 主菜单根屏（板块宫格）；各板块按需构建子屏 */
 
+#if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
+  if (lvbench_mode)
+    {
+      /* benchmark 自己建屏、自己排场景；主循环负责驱动 LVGL */
+
+      printf("[LVBENCH] start (LVGL %d.%d.%d)\n", LVGL_VERSION_MAJOR,
+             LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);
+      fflush(stdout);
+      lv_demo_benchmark();
+    }
+  else
+#endif
   if (cap_screen)
     {
       /* 截图专用：打开指定屏（无注入、不自动翻页） */

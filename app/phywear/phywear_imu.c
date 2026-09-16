@@ -59,7 +59,8 @@
                                     *      3 s 时已降到门限内，之后 ZUPT 能把静止稳住。 */
 #define TJ_BENCH_A       2.0f      /* bench 推手峰值 m/s²（整周期 0.6 s → 每次推 ~11.5 cm） */
 
-#define LVL_CARD_W       190
+#define LVL_CARD_W       190   /* P0 实测：缩小卡片+读数聚拢把每帧脏区并集降到 ~55%，
+                               * 但 fps 无变化（16.9 vs 17.1 ms）→ 回退观感 */
 #define LVL_CARD_H       150
 #define LVL_DOT          20
 #define LVL_RANGE_X      72.0f
