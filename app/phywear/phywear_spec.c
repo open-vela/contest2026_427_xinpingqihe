@@ -805,7 +805,9 @@ static void spec_build_page_spectrum(void)
                          PW_FNT_BODY, PW_COL_FAINT);
     }
 
-  lv_obj_set_pos(lab, 12, 228);
+  /* 原来放 (12,228)：卡片高 246、控件条就在那里，文字压在按钮上（2026-09-16 真机截图确认）。
+   * 改为与 Y 轴标签同一行右对齐：不占图区、不与控件重叠。 */
+  lv_obj_align(lab, LV_ALIGN_TOP_RIGHT, -12, 4);
 }
 
 /****************************************************************************

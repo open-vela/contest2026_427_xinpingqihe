@@ -397,6 +397,12 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   return cont;
 }
 
+/* 卡片 hairline 描边开关（0=不描边）。暗底上给卡片一条清晰的边，替代阴影
+ * （EPIC 禁阴影/模糊）；1px、半径外直边，观感是"仪器面板"的锐利感。想 A/B 改这里。 */
+#ifndef PW_CARD_LINE
+#  define PW_CARD_LINE   1
+#endif
+
 /* P0：卡片圆角。**EPIC 不支持圆角** —— lv_draw_sifli_epic.c 的 FILL/BORDER 分支里
  * `if(radius != 0) return 0;`，即任何带圆角的填充/边框都会回退到 CPU 软件光栅（掩码+混合）。
  * 默认 0（走 EPIC 直通）；要看"圆角到底吃多少帧率"就把这里改回 14 做同口径 A/B。 */
@@ -463,7 +469,13 @@ lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg)
   lv_obj_set_size(card, w, h);
   lv_obj_set_style_bg_color(card, bg, 0);
 
+#if PW_CARD_LINE
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
+  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
+#else
   lv_obj_set_style_border_width(card, 0, 0);
+#endif
   lv_obj_set_style_radius(card, PW_CARD_RADIUS, 0);
   lv_obj_set_style_pad_all(card, 0, 0);
   lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
@@ -1116,6 +1128,7 @@ void pw_ui_root(void)
   lv_obj_set_style_pad_all(btn, 0, 0);
   lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(btn, ui_settings_btn_cb, LV_EVENT_CLICKED, NULL);
+  pw_press_style(btn);
 
   lab = pw_label_new(btn, "...", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
@@ -1156,7 +1169,7 @@ void pw_ui_root(void)
       lv_obj_set_pos(chip, 12, 12);
       lv_obj_set_style_bg_color(chip, lv_color_hex(b->color), 0);
       lv_obj_set_style_bg_opa(chip, LV_OPA_20, 0);
-      lv_obj_set_style_radius(chip, LV_RADIUS_CIRCLE, 0);
+      lv_obj_set_style_radius(chip, 9, 0);   /* 圆角方块（v2 观感） */
       lv_obj_set_style_border_width(chip, 0, 0);
       lv_obj_set_style_pad_all(chip, 0, 0);
       lv_obj_remove_flag(chip, LV_OBJ_FLAG_SCROLLABLE);

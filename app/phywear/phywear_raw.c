@@ -857,8 +857,22 @@ static void raw_build_axis_page(int pi, int x, const char *name,
 
   /* 页眉：传感器名 + 单位（单位紧跟名字，把右上角/右下角让给切换按钮） */
 
+  /* 章节标签：3px 强调条 + 名称（v2 观感） */
+
+  {
+    lv_obj_t *bar = lv_obj_create(pg);
+
+    lv_obj_set_size(bar, 3, 18);
+    lv_obj_set_pos(bar, 14, 8);
+    lv_obj_set_style_bg_color(bar, accent, 0);
+    lv_obj_set_style_radius(bar, 2, 0);
+    lv_obj_set_style_border_width(bar, 0, 0);
+    lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+    pw_deco(bar);
+  }
+
   sub = pw_label_new(pg, name, PW_FNT_LARGE, accent);
-  lv_obj_set_pos(sub, 20, 4);
+  lv_obj_set_pos(sub, 24, 4);
 
   uni = pw_label_new(pg, unit, PW_FNT_MED, PW_COL_DIM);
   lv_obj_align_to(uni, sub, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
