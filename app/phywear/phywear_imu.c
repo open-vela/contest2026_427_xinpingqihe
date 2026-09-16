@@ -252,7 +252,7 @@ static void imu_set_page(int idx)
     }
 
   g_i.idx = idx;
-  lv_obj_scroll_to_x(g_i.scroller, idx * IMU_PAGE_W, LV_ANIM_OFF);
+  lv_obj_scroll_to_x(g_i.scroller, idx * IMU_PAGE_W, LV_ANIM_ON);   /* 切页转场 */
   imu_sync_dots();
 
   /* 动效（P1-2）：切到轨迹页时，图形卡用**查表弹簧**滑入。
@@ -878,7 +878,6 @@ static void imu_button(lv_obj_t *parent, int x, int y, int w, int h,
 
   lv_obj_set_pos(btn, x, y);
   lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
-  pw_motion_press_feedback(btn, y, 3);
 
   lab = pw_label_new(btn, text, PW_FNT_MED, PW_COL_TEXT);
   lv_obj_center(lab);

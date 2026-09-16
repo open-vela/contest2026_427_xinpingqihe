@@ -625,6 +625,10 @@ int pw_cap_open(const char *name)
   lv_obj_t *scr = NULL;
 
   if      (strcmp(name, "root")      == 0) { pw_ui_root(); return 1; }
+  else if (strncmp(name, "board", 5) == 0 && name[5] >= '0' && name[5] <= '5')
+                                          { return pw_ui_open_board(name[5] - '0'); }
+  else if (strcmp(name, "tools")     == 0) { return pw_ui_open_board(2); }
+  else if (strcmp(name, "mech")      == 0) { return pw_ui_open_board(0); }
   else if (strcmp(name, "raw")       == 0) scr = pw_raw_screen();
   else if (strcmp(name, "pendulum")  == 0) scr = pw_pendulum_screen();
   else if (strcmp(name, "spring")    == 0) scr = pw_spring_screen();

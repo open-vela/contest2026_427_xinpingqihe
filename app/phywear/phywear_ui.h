@@ -141,6 +141,13 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title);
 
 lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg);
 
+/* 统一按压反馈（LV_STATE_PRESSED 样式：translate_y +3、底色 Muted、120ms C4）。
+ * pw_card_new() 已自动调用；非卡片的可点对象（自建 lv_obj_create）请手动调用。 */
+void pw_press_style(lv_obj_t *obj);
+
+/* 装饰性 obj（图标块/色条/网格线）取消 CLICKABLE：否则会把按压状态从卡片上抢走 */
+void pw_deco(lv_obj_t *obj);
+
 /* 标签快捷创建 */
 
 lv_obj_t *pw_label_new(lv_obj_t *parent, const char *text,
@@ -189,6 +196,10 @@ lv_obj_t *pw_ai_coach_screen(void);
 /* 构建并加载主菜单根屏（应用启动时调用一次；可重复调用以刷新语言） */
 
 void pw_ui_root(void);
+
+/* 直接打开某个板块列表页（诊断/截图用）：0=力学 1=声学 2=工具 3=计时器 4=生活 5=自定义
+ * 返回 0 = 索引越界。真机 UI 与 cap 截图共用同一入口。 */
+int pw_ui_open_board(int idx);
 
 /* 自动演示（模拟验证/录屏用）：前台运行，自动"点击"依次打开各板块与实验页，
  * 播完自动回到根屏。pw_ui_demo_step() 推进一步（主循环按时间调用），

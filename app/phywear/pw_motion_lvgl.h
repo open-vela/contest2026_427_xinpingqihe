@@ -44,8 +44,14 @@ lv_anim_value_t pw_motion_path_decay(const lv_anim_t *a);
  * 只改 y 坐标（几何变化 → 局部重绘），不动样式，不触发 SW 变换路径。 */
 void pw_motion_slide_in_y(lv_obj_t *obj, int from_dy, uint32_t dur_ms);
 
-/* 同上，但可指定起始延时（用于宫格/列表逐项错峰；延时只排队不并发） */
-void pw_motion_slide_in_y_at(lv_obj_t *obj, int from_dy,
+/* 同上，但可指定起始延时（用于宫格/列表逐项错峰；延时只排队不并发）。
+ *
+ * ⚠️ base_y 必须由调用方显式给出。原因（2026-09-17 真机定位的真 BUG）：
+ * LVGL v9 的 lv_obj_set_y() 只写**样式 Y**，而 lv_obj_get_y() 读的是**已布局的 coords**
+ * —— 刚创建、布局尚未刷新的对象两者不一致，早期版本在函数内部读 get_y() 当动画终点，
+ * 结果同一批新建行的终点全被算成同一个 y，5 行叠在一起只剩最后一行可见
+ * （真机复现：工具板块只显示"水平仪"一行）。 */
+void pw_motion_slide_in_y_at(lv_obj_t *obj, int base_y, int from_dy,
                              uint32_t dur_ms, uint32_t delay_ms);
 
 /* 通用按压反馈：按下 y+dy(90ms C4)，抬起回到 base_y(160ms C4)。

@@ -203,14 +203,6 @@ static void ui_back_cb(lv_event_t *e)
 /* P1 动效：tile 按压反馈（按下 y+2px，抬起回位；C4 snap 150ms）。
  * 只动 y 一个属性；user_data 传 tile 的基准 y（与 CLICKED 的 user_data 各用一套）。 */
 
-static void ui_tile_press_cb(lv_event_t *e)
-{
-  lv_obj_t *o = lv_event_get_target(e);
-  int base = (int)(intptr_t)lv_event_get_user_data(e);
-  int dy = (lv_event_get_code(e) == LV_EVENT_PRESSED) ? 2 : 0;
-
-  pw_motion_press_y(o, base, dy, 150);
-}
 
 static void ui_tile_cb(lv_event_t *e)
 {
@@ -371,6 +363,7 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   lv_obj_set_style_pad_all(btn, 0, 0);
   lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(btn, ui_back_cb, LV_EVENT_CLICKED, NULL);
+  pw_press_style(btn);
 
   lab = pw_label_new(btn, "<", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
@@ -396,6 +389,11 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   lv_obj_set_style_pad_all(cont, 0, 0);
   lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
 
+  /* 切屏转场：内容区从 +16px 落位（C2 260ms，单对象）。
+   * 所有走 pw_topbar() 的页面自动获得同一条入场动效。 */
+
+  pw_motion_slide_in_y_at(cont, PW_TOPBAR_H, 16, 260, 0);
+
   return cont;
 }
 
@@ -408,6 +406,56 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
                                * 故保留观感。宏留着当实验旋钮，见 docs/evidence/p0-20260916/ */
 #endif
 
+/* 统一按压态（2026-09-17）：把"按下有反应"做成**样式**而不是逐个注册事件。
+ * 装在 pw_card_new() 上 → 全 App 所有卡片/按钮/行/宫格自动获得反馈；
+ * 子件若要自定义（如已有点击动画）可再叠自己的 LV_STATE_PRESSED 样式。
+ * 只改 translate_y（位移）+ 底色，**不碰 transform/圆角/阴影**，因此不进 SW 变换路径。 */
+
+static lv_style_t                g_st_press;
+static lv_style_transition_dsc_t g_tr_press;
+static bool                      g_press_ready;
+
+void pw_press_style(lv_obj_t *obj)
+{
+#if PW_UI_MOTION
+  static const lv_style_prop_t props[] =
+  {
+    LV_STYLE_TRANSLATE_Y, LV_STYLE_BG_COLOR, LV_STYLE_BG_OPA, 0
+  };
+
+  if (obj == NULL)
+    {
+      return;
+    }
+
+  if (!g_press_ready)
+    {
+      lv_style_init(&g_st_press);
+      lv_style_set_translate_y(&g_st_press, 3);
+      lv_style_set_bg_color(&g_st_press, PW_COL_CARD_LT);
+      lv_style_set_bg_opa(&g_st_press, LV_OPA_COVER);
+      lv_style_transition_dsc_init(&g_tr_press, props,
+                                   pw_motion_path_c4, 120, 0, NULL);
+      lv_style_set_transition(&g_st_press, &g_tr_press);
+      g_press_ready = true;
+    }
+
+  lv_obj_add_style(obj, &g_st_press, LV_STATE_PRESSED);
+#else
+  LV_UNUSED(obj);
+#endif
+}
+
+/* 装饰性 obj 不参与触摸。lv_obj_create() 默认带 CLICKABLE，
+ * 图标块/色条/网格线会把按压状态从卡片上"抢走"——表现为"按在图标上没反应"。 */
+void pw_deco(lv_obj_t *obj)
+{
+  if (obj != NULL)
+    {
+      lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    }
+}
+
 lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg)
 {
   lv_obj_t *card = lv_obj_create(parent);
@@ -419,6 +467,7 @@ lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg)
   lv_obj_set_style_radius(card, PW_CARD_RADIUS, 0);
   lv_obj_set_style_pad_all(card, 0, 0);
   lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  pw_press_style(card);          /* 统一按压反馈：位移 + 底色，120ms C4 */
 
   return card;
 }
@@ -560,11 +609,12 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
       lv_color_t namecol = ok ? PW_COL_TEXT : PW_COL_FAINT;
       lv_color_t desccol = ok ? PW_COL_DIM   : PW_COL_FAINT;
 
-      row = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 76,
+      row = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 64,
                         PW_COL_CARD);
       lv_obj_set_pos(row, MENU_X0, y);
 #if PW_UI_MOTION
-      pw_motion_slide_in_y_at(row, 10, 280, (uint32_t)i * 50);
+      /* 错峰入场：**必须传显式 base y**（见 pw_motion_slide_in_y_at 注释） */
+      pw_motion_slide_in_y_at(row, y, 12, 240, (uint32_t)i * 40);
 #endif
       lv_obj_set_style_bg_color(row, PW_COL_CARD_LT, LV_STATE_PRESSED);
 
@@ -573,18 +623,19 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
           /* 左侧强调条 */
 
           strip = lv_obj_create(row);
-          lv_obj_set_size(strip, 4, 48);
+          lv_obj_set_size(strip, 3, 36);
           lv_obj_set_pos(strip, 10, 14);
+          pw_deco(strip);
           lv_obj_set_style_bg_color(strip, accent, 0);
           lv_obj_set_style_radius(strip, 2, 0);
           lv_obj_set_style_border_width(strip, 0, 0);
           lv_obj_remove_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 30, 12);
+          lv_obj_set_pos(lab, 26, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 30, 48);
+          lv_obj_set_pos(lab, 26, 34);
 
           lab = pw_label_new(row, ">", PW_FNT_MED, PW_COL_DIM);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
@@ -597,16 +648,16 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
           /* 未实现项：置灰 + 角标 */
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 22, 12);
+          lv_obj_set_pos(lab, 22, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 22, 48);
+          lv_obj_set_pos(lab, 22, 34);
 
           lab = pw_label_new(row, PW_STR(UI_PLANNED), PW_FNT_BODY, PW_COL_FAINT);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -14, 0);
         }
 
-      y += 76 + MENU_GAP;
+      y += 64 + MENU_GAP;
     }
 
   return scr;
@@ -686,6 +737,25 @@ static lv_obj_t *ui_custom_open(void)
   };
   return pw_board_list(PW_STR(UI_CUSTOM), PW_ACC_CUSTOM,
                        items, sizeof(items) / sizeof(items[0]));
+}
+
+int pw_ui_open_board(int idx)
+{
+  lv_obj_t *(*open)(void) = NULL;
+
+  switch (idx)
+    {
+      case 0: open = ui_mech_open;   break;
+      case 1: open = ui_acou_open;   break;
+      case 2: open = ui_tool_open;   break;
+      case 3: open = ui_time_open;   break;
+      case 4: open = ui_every_open;  break;
+      case 5: open = ui_custom_open; break;
+      default: return 0;
+    }
+
+  pw_scr_open(open());
+  return 1;
 }
 
 /****************************************************************************
@@ -1070,16 +1140,12 @@ void pw_ui_root(void)
       lv_obj_add_event_cb(tile, ui_tile_cb, LV_EVENT_CLICKED,
                           (void *)b->open);
 #if PW_UI_MOTION
-      /* 按压反馈：按下/抬起/滑出都处理；EVENT_BUBBLE 让点在子控件（图标/文字）
-       * 上也能冒泡到 tile，否则按在图标上不会有反馈。 */
+      /* 按压反馈走 pw_card_new() 里的统一按压样式（位移+底色，120ms C4）；
+       * 这里只做**入场错峰**：8 块依次从 +12px 落位。EVENT_BUBBLE 让点在
+       * 图标/文字上的点击仍冒泡到 tile。 */
 
       lv_obj_add_flag(tile, LV_OBJ_FLAG_EVENT_BUBBLE);
-      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_PRESSED,
-                          (void *)(intptr_t)y);
-      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_RELEASED,
-                          (void *)(intptr_t)y);
-      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_PRESS_LOST,
-                          (void *)(intptr_t)y);
+      pw_motion_slide_in_y_at(tile, y, 12, 240, (uint32_t)i * 40);
 #endif
 
       /* 板块图标：淡色圆底 + LV_SYMBOL 字形（内置 Montserrat 已含 symbols，

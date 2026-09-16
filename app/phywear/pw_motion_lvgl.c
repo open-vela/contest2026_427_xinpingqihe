@@ -223,8 +223,42 @@ lv_anim_value_t pw_motion_path_decay(const lv_anim_t *a)
                                         0, PW_MOTION_RES)));
 }
 
-void pw_motion_slide_in_y_at(lv_obj_t *obj, int from_dy,
+void pw_motion_slide_in_y_at(lv_obj_t *obj, int base_y, int from_dy,
                              uint32_t dur_ms, uint32_t delay_ms)
+{
+#if PW_UI_MOTION
+  lv_anim_t a;
+
+  if (obj == NULL)
+    {
+      return;
+    }
+
+  if (dur_ms > 320)
+    {
+      dur_ms = 320;                    /* 硬顶（motion-lvgl.csv Guard） */
+    }
+
+  /* 先把对象落到起点（写样式 Y，立即生效），延时期间它就一直停在起点，
+   * 不会出现"先出现在终点、延时到了再跳一下"的抖动。 */
+
+  lv_obj_set_y(obj, base_y + from_dy);
+
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, obj);
+  lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+  lv_anim_set_values(&a, base_y + from_dy, base_y);
+  lv_anim_set_duration(&a, dur_ms);
+  lv_anim_set_delay(&a, delay_ms);
+  lv_anim_set_path_cb(&a, pw_motion_path_c2);      /* 入场默认 C2 soft */
+  lv_anim_start(&a);
+#else
+  LV_UNUSED(obj); LV_UNUSED(base_y); LV_UNUSED(from_dy);
+  LV_UNUSED(dur_ms); LV_UNUSED(delay_ms);
+#endif
+}
+
+void pw_motion_slide_in_y(lv_obj_t *obj, int from_dy, uint32_t dur_ms)
 {
 #if PW_UI_MOTION
   lv_anim_t a;
@@ -237,25 +271,22 @@ void pw_motion_slide_in_y_at(lv_obj_t *obj, int from_dy,
 
   if (dur_ms > 320)
     {
-      dur_ms = 320;                    /* 硬顶（motion-lvgl.csv Guard） */
+      dur_ms = 320;
     }
 
-  y0 = lv_obj_get_y(obj);
+  /* 用**样式 Y**（lv_obj_get_y_aligned）而不是已布局 coords：
+   * 这个函数在"对象刚建好"的路径上也会被调用。 */
+
+  y0 = lv_obj_get_y_aligned(obj);
 
   lv_anim_init(&a);
   lv_anim_set_var(&a, obj);
   lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
   lv_anim_set_values(&a, y0 + from_dy, y0);
   lv_anim_set_duration(&a, dur_ms);
-  lv_anim_set_delay(&a, delay_ms);
-  lv_anim_set_path_cb(&a, pw_motion_path_c2);      /* 入场默认 C2 soft */
+  lv_anim_set_path_cb(&a, pw_motion_path_c2);
   lv_anim_start(&a);
 #else
-  LV_UNUSED(obj); LV_UNUSED(from_dy); LV_UNUSED(dur_ms); LV_UNUSED(delay_ms);
+  LV_UNUSED(obj); LV_UNUSED(from_dy); LV_UNUSED(dur_ms);
 #endif
-}
-
-void pw_motion_slide_in_y(lv_obj_t *obj, int from_dy, uint32_t dur_ms)
-{
-  pw_motion_slide_in_y_at(obj, from_dy, dur_ms, 0);
 }
