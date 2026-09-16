@@ -138,6 +138,7 @@ struct imu_ui_s
   int       bias_rec;
   int       six_face;          /* 下一个要取的面 0..5 */
   int       mag_rec;
+  int       live_phase;        /* 错峰更新相位（PW_LIVE_STAGGER） */
   int       ahrs_inited;
   int       mag_seen;
   uint32_t  last_ms;
@@ -308,6 +309,16 @@ static void imu_level_dot(float roll, float pitch)
   lv_obj_set_pos(g_i.lvl_dot, cx + (int)dx, cy + (int)dy);
 }
 
+/* P0 实验开关：实时页的更新**错峰**。
+ * 动机：LVGL 局部渲染下，每个独立脏矩形都会触发一次 flush（拷贝 + 面板传输 + 同步握手），
+ * 而每帧固定 ~17 ms 的成本与"画了多少像素"几乎无关 —— 所以先怀疑**每帧 flush 的次数**。
+ * 置 1 = 每拍只更新一处（三个角度 / 小球 / 零偏 / 磁状态 轮转，各自 ~12~17 Hz），
+ * 把每帧多处脏矩形压成一处。置 0 = 原始行为（全部每拍更新，50 Hz）。 */
+
+#ifndef PW_LIVE_STAGGER
+#  define PW_LIVE_STAGGER 0   /* 实测：错峰对 fps 无影响（47~49 与 48~49 相同），保持原行为 */
+#endif
+
 static void imu_live_update(void)
 {
   float r = 0.0f;
@@ -319,6 +330,35 @@ static void imu_live_update(void)
   pw_ahrs_euler(&g_i.ahrs, &r, &p, &y);
   pw_ahrs_bias(&g_i.ahrs, b);
 
+#if PW_LIVE_STAGGER
+  /* 轮转：每拍只动一处，避免一帧里出现多个互不相邻的脏矩形 */
+
+  g_i.live_phase = (g_i.live_phase + 1) & 3;
+
+  if (g_i.live_phase == 0)
+    {
+      lv_label_set_text_fmt(g_i.ax_val[0], "%+.1f", (double)r);
+    }
+  else if (g_i.live_phase == 1)
+    {
+      lv_label_set_text_fmt(g_i.ax_val[1], "%+.1f", (double)p);
+    }
+  else if (g_i.live_phase == 2)
+    {
+      lv_label_set_text_fmt(g_i.ax_val[2], "%+.1f", (double)y);
+    }
+  else
+    {
+      imu_level_dot(r, p);
+    }
+
+  if ((g_i.live_phase & 1) == 0)
+    {
+      snprintf(buf, sizeof(buf), PW_STR(IMU_FMT_BIAS),
+               imu_dps1000(b[0]), imu_dps1000(b[1]), imu_dps1000(b[2]));
+      lv_label_set_text(g_i.bias_lab, buf);
+    }
+#else
   lv_label_set_text_fmt(g_i.ax_val[0], "%+.1f", (double)r);
   lv_label_set_text_fmt(g_i.ax_val[1], "%+.1f", (double)p);
   lv_label_set_text_fmt(g_i.ax_val[2], "%+.1f", (double)y);
@@ -328,6 +368,7 @@ static void imu_live_update(void)
   snprintf(buf, sizeof(buf), PW_STR(IMU_FMT_BIAS),
            imu_dps1000(b[0]), imu_dps1000(b[1]), imu_dps1000(b[2]));
   lv_label_set_text(g_i.bias_lab, buf);
+#endif
 
   snprintf(buf, sizeof(buf), PW_STR(IMU_FMT_MAG),
            g_i.mag_seen ? PW_STR(IMU_V_YES) : PW_STR(IMU_V_NO));

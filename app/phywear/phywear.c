@@ -54,6 +54,15 @@
 /* P0：主循环休眠上限（ms）。10 = 改动前的固定行为；1~2 = 低延迟模式。
  * 可回退开关：改回 10 即完全恢复原状。 */
 
+/* P0 性能探针（2026-09-16）：按秒打印 fps、LVGL 渲染耗时均值/峰值、主循环次数。
+ * 为什么需要：30 s 心跳的 fps 是**平均**，会把"图线 10 Hz 才重绘"的空闲时间平均进去，
+ * 掩盖了小脏区连续更新时能达到的瞬时帧率（用户在轨迹页看到过 60 FPS）。
+ * 设 0 可整体关掉（零开销）。 */
+
+#ifndef PW_PERF_PROBE
+#  define PW_PERF_PROBE 0   /* 默认关：置 1 打开每秒 [PERF] 行（fps/渲染耗时），优化时用 */
+#endif
+
 #ifndef PW_LOOP_SLEEP_MAX_MS
 #  define PW_LOOP_SLEEP_MAX_MS 2
 #endif
@@ -98,6 +107,13 @@ static size_t          g_fps_frame;     /* 单帧字节数 */
 static volatile uint32_t g_fps_cnt;
 static volatile uint32_t g_loop_next_ms;   /* LVGL 建议的下次休眠上限（ms） */
 
+#if PW_PERF_PROBE
+static volatile uint32_t g_perf_us_sum;   /* 渲染耗时累加（us） */
+static volatile uint32_t g_perf_us_max;   /* 渲染耗时峰值（us） */
+static volatile uint32_t g_perf_n;        /* 渲染帧数 */
+static struct timespec   g_perf_t0;       /* 本轮渲染起点 */
+#endif
+
 
 /* 计帧：挂 LVGL 显示事件，而不是替换 flush 回调。
  * lv_refr.c 只在"本轮真的有区域重绘"时才发 LV_EVENT_RENDER_READY，
@@ -106,6 +122,36 @@ static volatile uint32_t g_loop_next_ms;   /* LVGL 建议的下次休眠上限�
 
 static void pw_fps_render_cb(lv_event_t *e)
 {
+#if PW_PERF_PROBE
+  lv_event_code_t code = lv_event_get_code(e);
+
+  if (code == LV_EVENT_RENDER_START)
+    {
+      clock_gettime(CLOCK_MONOTONIC, &g_perf_t0);
+      return;
+    }
+
+  if (code == LV_EVENT_RENDER_READY)
+    {
+      struct timespec t1;
+      uint32_t us;
+
+      clock_gettime(CLOCK_MONOTONIC, &t1);
+      us = (uint32_t)((t1.tv_sec - g_perf_t0.tv_sec) * 1000000L +
+                      (t1.tv_nsec - g_perf_t0.tv_nsec) / 1000L);
+
+      g_perf_us_sum += us;
+      g_perf_n++;
+      if (us > g_perf_us_max)
+        {
+          g_perf_us_max = us;
+        }
+
+      g_fps_cnt++;
+      return;
+    }
+#endif
+
   if (lv_event_get_code(e) == LV_EVENT_RENDER_READY)
     {
       g_fps_cnt++;
@@ -133,6 +179,9 @@ static void pw_fps_init(lv_display_t *disp)
   /* 先挂计帧事件（与有没有 /dev/fb0 无关，真机也能统计帧率） */
 
   lv_display_add_event_cb(disp, pw_fps_render_cb, LV_EVENT_RENDER_READY, NULL);
+#if PW_PERF_PROBE
+  lv_display_add_event_cb(disp, pw_fps_render_cb, LV_EVENT_RENDER_START, NULL);
+#endif
 
   g_fps_fd = open("/dev/fb0", O_RDWR);
   if (g_fps_fd < 0)
@@ -1593,6 +1642,11 @@ int main(int argc, FAR char *argv[])
 
     clock_gettime(CLOCK_MONOTONIC, &shot_t0);
 
+#if PW_PERF_PROBE
+    struct timespec perf_mark = shot_t0;
+    uint32_t perf_loop_mark = 0;
+#endif
+
     while (1)
       {
         struct timespec tn;
@@ -1753,6 +1807,35 @@ int main(int argc, FAR char *argv[])
             tmark = tn;
             loop = 0;
           }
+
+#if PW_PERF_PROBE
+        /* 每秒一行：瞬时 fps + 渲染耗时。fps 用**1 s 窗口**，避免 30 s 平均把
+         * "图线 10 Hz 才重绘"的空闲时间摊进来（那会掩盖瞬时能力）。 */
+
+        {
+          struct timespec pn;
+
+          clock_gettime(CLOCK_MONOTONIC, &pn);
+          if ((pn.tv_sec - perf_mark.tv_sec) >= 1)
+            {
+              uint32_t n = g_perf_n;
+              uint32_t lps = loop - perf_loop_mark;
+
+              printf("[PERF] fps=%u render_avg=%uus render_max=%uus loops=%u\n",
+                     (unsigned)g_fps_cnt,
+                     (unsigned)(n > 0 ? g_perf_us_sum / n : 0),
+                     (unsigned)g_perf_us_max, (unsigned)lps);
+              fflush(stdout);
+
+              g_fps_cnt = 0;
+              g_perf_n = 0;
+              g_perf_us_sum = 0;
+              g_perf_us_max = 0;
+              perf_mark = pn;
+              perf_loop_mark = loop;
+            }
+        }
+#endif
 
         /* 休眠：不超过 PW_LOOP_SLEEP_MAX_MS，也不超过 LVGL 说的"下次还有多久"。
          * 下限 1 ms：避免空转把 CPU 吃满（本板还有 50 Hz 采样线程要跑）。 */

@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-16 21:47:32",
- "generated_at_epoch": 1789566452,
+ "generated_at": "2026-09-16 22:03:07",
+ "generated_at_epoch": 1789567387,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 201,
+  "files": 202,
   "critical": 125,
-  "bytes": 8898082,
+  "bytes": 8942549,
   "missing_in_workspace": 0
  },
  "files": [
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "c13b5cedab7b800f3075753e2381a66f",
-   "size": 55325,
+   "md5": "6e92900d6a361162a9db87150d00fdce",
+   "size": 57930,
    "present": true
   },
   {
@@ -139,8 +139,8 @@
    "dst": "apps/examples/phywear/phywear_imu.c",
    "compare": "exact",
    "critical": true,
-   "md5": "c020904bcbb94df6064fc9ca025d808e",
-   "size": 38063,
+   "md5": "dc16d98fc4ad86c25b7026a3396f9a9e",
+   "size": 39554,
    "present": true
   },
   {
@@ -1582,6 +1582,17 @@
    "critical": false,
    "md5": "46d5b1bd932ddaa4fa528ff6b22eccda",
    "size": 12253,
+   "present": true
+  },
+  {
+   "rule": "vendor-ref",
+   "rule_desc": "vendor/sifli 官方基线快照（参考，含 EPIC PR #31）",
+   "snap": "src/vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c",
+   "dst": "vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c",
+   "compare": "exact",
+   "critical": false,
+   "md5": "73e1f5e4ab4b02a69aa8f7b624489665",
+   "size": 40371,
    "present": true
   },
   {
