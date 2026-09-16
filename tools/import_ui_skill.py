@@ -42,6 +42,81 @@ COLUMN_HINTS = {
 HEAVY_KEYWORDS = ["shadow", "blur", "glass", "neumorph",
                   "3d", "glow", "backdrop", "阴影", "模糊", "拟态"]
 
+# —— 已知 schema 指纹（2026-09-16 用真实 CSV v2.15.0 实测后加入）——
+# 教训：**不能拿整行文本扫关键字**。真实 styles.csv 的 `Do Not Use For` 里会出现
+# "performance-critical"、`Implementation Checklist` 里会出现 gradient 之类，
+# 于是 Dark Mode (OLED) / Bento Box Grid / Flat Design 这些**低负载首选**会被误判成"禁用"。
+# 正确做法：只按**结构化字段**判定 —— `Effects & Animation` + `Performance` + `Complexity`。
+KNOWN = {
+    "styles": {
+        "name": ["Style Category", "Style ID"],
+        "effect": ["Effects & Animation"],
+        "perf": ["Performance"],
+        "complex": ["Complexity"],
+        "dark": ["Dark Mode ✓", "Dark Mode"],
+        "light": ["Light Mode ✓", "Light Mode"],
+        "for": ["Best For"],
+        "notfor": ["Do Not Use For"],
+        "a11y": ["Accessibility"],
+        "keywords": ["Keywords", "AI Prompt Keywords"],
+    },
+    "colors": {
+        "name": ["Product Type"],
+        "hex": ["Primary", "Background", "Foreground", "Card", "Accent",
+                "Muted", "Border", "Secondary"],
+    },
+    "typography": {
+        "name": ["Font Pairing Name"],
+        "cat": ["Category"],
+        "head": ["Heading Font"],
+        "body": ["Body Font"],
+        "mood": ["Mood/Style Keywords"],
+    },
+    "ui-reasoning": {
+        "name": ["UI_Category"],
+        "pattern": ["Recommended_Pattern"],
+        "style": ["Style_Priority"],
+        "rules": ["Decision_Rules"],
+        "anti": ["Anti_Patterns"],
+    },
+    "lvgl": {                      # 本队新增的 LVGL 栈（上游 stack schema）
+        "name": ["Category"],
+        "issue": ["Guideline"],
+        "desc": ["Description"],
+        "do": ["Do"],
+        "dont": ["Don't"],
+        "sev": ["Severity"],
+        "status": ["Status"],
+        "verified": ["Verified At"],
+    },
+    "ux-guidelines": {
+        "name": ["Category"],
+        "issue": ["Issue"],
+        "do": ["Do"],
+        "dont": ["Don't"],
+        "sev": ["Severity"],
+    },
+}
+
+
+def field(header, row, names):
+    """按列名取单元格；找不到返回空串（不猜）。"""
+    for nm in names:
+        for i, col in enumerate(header):
+            if col.strip().lower() == nm.strip().lower():
+                return row[i].strip() if i < len(row) else ""
+    return ""
+
+
+def load_level(effect: str, perf: str, complex_: str):
+    """按结构化字段判负载档：低 / 中 / 高。只扫这三列，不扫整行。"""
+    blob = (effect + " " + perf + " " + complex_).lower()
+    if any(k in blob for k in HEAVY_KEYWORDS):
+        return "high"
+    if any(k in blob for k in ["gradient", "渐变", "animation-heavy", "blur"]):
+        return "mid"
+    return "low"
+
 # 条件可用：渐变**只有 2 段 + HOR/VER 方向**才走 EPIC（见 lv_draw_sifli_epic.c 的
 # FILL 分支），所以不能一刀切禁用，标为"需人工确认"。
 CONDITIONAL_KEYWORDS = ["gradient", "渐变"]
@@ -101,6 +176,116 @@ def import_file(path, out_dir):
     name = os.path.basename(path)
 
     lines = ["### `%s`（%d 行数据，%d 列）" % (name, len(body), len(header)), ""]
+
+    # ---- 已知 schema 快路径：按字段取值，避免整行扫关键字的误判 ----
+
+    stem = os.path.basename(path).replace(".csv", "")
+    if stem in KNOWN:
+        spec = KNOWN[stem]
+        lines.append("**schema 指纹命中：`%s`（v2.15.0 实测列名）**" % stem)
+        lines.append("")
+
+        if stem == "styles":
+            buckets = {"low": [], "mid": [], "high": []}
+            for r in body:
+                nm = field(header, r, spec["name"])
+                if not nm:
+                    continue
+                lv = load_level(field(header, r, spec["effect"]),
+                                field(header, r, spec["perf"]),
+                                field(header, r, spec["complex"]))
+                dark = field(header, r, spec["dark"]) or "-"
+                perf = field(header, r, spec["perf"]) or "-"
+                buckets[lv].append((nm, dark, perf))
+            for lv, label in (("low", "低负载（本板首选）"),
+                              ("mid", "中负载（需实测确认）"),
+                              ("high", "高负载（本板禁用：EPIC 会回退 CPU）")):
+                items = buckets[lv]
+                lines.append("**%s，%d 条**：" % (label, len(items)))
+                if lv == "low":
+                    lines.append("")
+                    lines.append("| 风格 | 暗色 | Performance |")
+                    lines.append("|---|---|---|")
+                    for nm, dark, perf in items[:40]:
+                        lines.append("| %s | %s | %s |" % (nm, dark, perf))
+                else:
+                    lines.append("  " + "、".join(x[0] for x in items[:40]))
+                lines.append("")
+            lines.append("> 判定只看 `Effects & Animation` + `Performance` + `Complexity` 三列，"
+                         "不扫整行（整行扫会把 Dark Mode (OLED)/Bento Box Grid 误杀）。")
+            lines.append("")
+        elif stem == "colors":
+            conv = []
+            seen = set()
+            for r in body:
+                nm = field(header, r, spec["name"])
+                for col in spec["hex"]:
+                    v = field(header, r, [col])
+                    p = hex_to_rgb565(v)
+                    if p and (nm, v) not in seen:
+                        seen.add((nm, v))
+                        conv.append((nm, col, v, p))
+            lines.append("**色板（Product Type × 角色 → RGB565）：%d 条**" % len(conv))
+            lines.append("")
+            lines.append("| Product Type | 角色 | 源色 | RGB565 | 对近黑底对比度 |")
+            lines.append("|---|---|---|---|---|")
+            for nm, col, v, (c565, rr, gg, bb) in conv[:40]:
+                ct = contrast((rr, gg, bb), (10, 12, 16))
+                lines.append("| %s | %s | `%s` | `0x%04X` | %.2f:1 |" % (nm, col, v, c565, ct))
+            lines.append("")
+        elif stem == "typography":
+            lines.append("**字体配对 → 本板只取「层级意图」**（Heading/Body 的字号与字重关系），"
+                         "字体名与 Google Fonts URL 一律不用（本板是 5 个位图子集字号）。")
+            lines.append("")
+            lines.append("| 配对名 | 类别 | Heading | Body | 情绪关键词（截断） |")
+            lines.append("|---|---|---|---|---|")
+            for r in body[:24]:
+                lines.append("| %s | %s | %s | %s | %s |" % (
+                    field(header, r, spec["name"]), field(header, r, spec["cat"]),
+                    field(header, r, spec["head"]), field(header, r, spec["body"]),
+                    field(header, r, spec["mood"])[:40]))
+            lines.append("")
+        elif stem == "ui-reasoning":
+            lines.append("**推理规则（页面类型 → 模式/风格优先级）**：")
+            lines.append("")
+            lines.append("| UI_Category | Recommended_Pattern | Style_Priority | Anti_Patterns |")
+            lines.append("|---|---|---|---|")
+            for r in body[:30]:
+                lines.append("| %s | %s | %s | %s |" % (
+                    field(header, r, spec["name"]), field(header, r, spec["pattern"])[:40],
+                    field(header, r, spec["style"])[:40], field(header, r, spec["anti"])[:30]))
+            lines.append("")
+        elif stem in ("lvgl",):
+            st = {}
+            for r in body:
+                k = field(header, r, spec["status"]) or "-"
+                st[k] = st.get(k, 0) + 1
+            lines.append("**规则 %d 条；Status 分布**：%s" %
+                         (len(body), "、".join("%s×%d" % (a, b) for a, b in st.items())))
+            lines.append("")
+            lines.append("| Category | Guideline | Severity | Status | Verified At |")
+            lines.append("|---|---|---|---|---|")
+            for r in body:
+                lines.append("| %s | %s | %s | %s | %s |" % (
+                    field(header, r, spec["name"]), field(header, r, spec["issue"])[:44],
+                    field(header, r, spec["sev"]), field(header, r, spec["status"]),
+                    field(header, r, spec["verified"])[:60]))
+            lines.append("")
+        elif stem == "ux-guidelines":
+            sev = {}
+            for r in body:
+                sev[field(header, r, spec["sev"]) or "-"] = \
+                    sev.get(field(header, r, spec["sev"]) or "-", 0) + 1
+            lines.append("**按严重度统计**：" + "、".join("%s×%d" % (k, v) for k, v in sev.items()))
+            lines.append("")
+            lines.append("| Category | Issue | Do | Don't | Severity |")
+            lines.append("|---|---|---|---|---|")
+            for r in body[:24]:
+                lines.append("| %s | %s | %s | %s | %s |" % (
+                    field(header, r, spec["name"]), field(header, r, spec["issue"])[:40],
+                    field(header, r, spec["do"])[:40], field(header, r, spec["dont"])[:40],
+                    field(header, r, spec["sev"])))
+            lines.append("")
     lines.append("识别到的列：")
     for cat in ["style", "palette", "font", "rule", "ux"]:
         if cat in cats:

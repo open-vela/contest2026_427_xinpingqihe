@@ -3,6 +3,8 @@
 来源与改造说明：本 Skill 的结构与分类参考开源项目 **ui-ux-pro-max-skill**
 （https://github.com/nextlevelbuilder/ui-ux-pro-max-skill ，MIT）的
 「设计数据库」组织方式（风格 / 色板 / 字体配对 / 推理规则 / UX 指南）。
+**数据层已按上游 v2.15.0 快照照搬并入库**：`third_party/ui-ux-pro-max/`（5 个数据 CSV + 2 个参考栈 + LICENSE）。
+**机器可读版规则**见 `third_party/ui-ux-pro-max/stacks/lvgl.csv`（本队新增的 LVGL 栈：14 条，含 Severity / Status / Verified At）。
 
 **但内容不是照搬**：那份 Skill 的产出是 HTML + Tailwind 片段，目标是浏览器；
 本板是 **390×450 AMOLED + SF32LB52 + EPIC 硬件加速 + LVGL 9**，
@@ -15,24 +17,35 @@
 
 ---
 
-## 1. 风格清单（只列"低渲染负载"方向，按优先级）
+## 1. 风格清单（**上游实名**，已按本板翻译）
 
-| 风格 | 特征 | 适配本板 | 负载 |
+判定依据是上游 `styles.csv` 的三个结构化字段（`Performance` / `Effects & Animation` / `Complexity`），
+**不是**扫整行文本 —— 实测教训：整行扫会把 `Dark Mode (OLED)`、`Bento Box Grid` 这类低负载风格误判成"禁用"。
+
+| 上游风格 | 上游声明（cost / effects） | 本板翻译：要什么、砍什么 | 结论 |
 |---|---|---|---|
-| **Flat Dark（默认）** | 纯色块 + 细分割线 + 直角 | ✅ 首选 | 最低（EPIC 直通） |
-| **Bento 网格** | 大小卡片拼贴、层级用留白与明度 | ✅ 首选（直角卡片即可） | 低 |
-| **Instrument / 仪表** | 大数字 + 刻度线 + 单一强调色 | ✅ 适合物理量读数 | 低 |
-| **Neumorphism（新拟态）** | 双向阴影模拟凸起 | ❌ 依赖阴影 | 高（禁用） |
-| **Glassmorphism（毛玻璃）** | 半透明 + 模糊 | ❌ 依赖模糊/混合 | 高（禁用） |
-| **3D / 拟物渐变** | 高光、渐变、贴图 | ❌ 渐变仅 2 段 H/V | 中高（禁用） |
+| **Flat Design** | cost:low；无渐变无阴影；hover 只改颜色/透明度 | 全盘可用；hover → 按压时的颜色变化 | ✅ **默认风格** |
+| **Brutalism** | cost:low；**sharp corners (0px)**、粗字重、可见网格 | 与 EPIC"圆角必须 0"天然一致 | ✅ 入口页/仪表页 |
+| **Data-Dense Dashboard** | cost:low；复杂度 Medium | 只取"高信息密度 + 网格对齐"；图表按 10–15 Hz 重绘 | ✅ 读数/分析页 |
+| **Real-Time Monitoring** | cost:low；实时图表 + 状态脉冲 | 取"状态点 + 数值"；**脉冲用透明度，不用 glow** | ✅ 实时页 |
+| **Bento Box Grid** | cost:low；但效果是 `rounded-xl(16px) + subtle shadows + hover scale(1.02)` | **只取网格跨列/跨行**；圆角、阴影、缩放**三样全砍**（EPIC 拒绝） | ⚠️ 取布局、弃装饰 |
+| **Minimal & Direct** | cost:low；复杂度 Medium | 可用（"平滑滚动"本板无意义，去掉） | ✅ 向导页 |
+| Neumorphism / Glassmorphism / 3D & Hyperrealism / Claymorphism / Liquid Glass | 依赖阴影/模糊/渐变 | **不可用**：EPIC 会回退 CPU 软光栅 | ❌ 禁用 |
 
-**推理规则（什么场景选什么）**：
-1. 实时读数页 → Instrument（大数字 + 单位 + 每轴独立量程）。
-2. 功能入口/主页 → Bento 网格（2×4 tile，直角，色块区分板块）。
-3. 标定/向导页 → Flat Dark + 步骤进度点。
-4. 需要"物理手感"的反馈 → 见 §3（动效），不要靠阴影/发光。
+> 上游 `styles.csv` 共 **88 条**，其自带 `Performance` 字段分布为 **cost:low 62 / cost:moderate 19 / cost:high 7**；
+> 本队只从 cost:low 里挑，且逐条核对 `Effects & Animation` 是否撞上 EPIC 的三个禁区（圆角/阴影/变换）。
 
-## 2. 色板（本仓现行 token，直接使用，勿自创色值）
+## 2. 色板（**上游 colors.csv 是色值来源**，本仓 token 是落地形态）
+
+上游 `data/colors.csv`：**192 行**（Product Type × 角色），角色含 Primary / Background / Foreground /
+Card / Muted / Border / Accent / Destructive 等 **19 列**。一条命令即可得到"每个 Product Type 的色值 →
+RGB565 + 对近黑底对比度"的报告：
+
+```bash
+python3 tools/phywear/import_ui_skill.py --in third_party/ui-ux-pro-max/data
+```
+
+下表是本仓现行 token（已落地，勿自创色值）：
 
 | 用途 | token | 说明 |
 |---|---|---|
@@ -100,3 +113,10 @@ Google Fonts 动态导入、响应式断点（`@media`）、CSS 变量/预处理
 Tailwind 类名与 JIT 生成、React/Vue 组件、键盘 focus 环、hover 态、
 CSS `transition`/`@keyframes`、SVG 图标、浏览器滚动与惯性滚动、
 Web 字体回退链（本板只有 5 个固定字号的位图子集）。
+
+## 8. 机器可读版本（与本文档同源，改一处必须改两处）
+
+上述规则同时以上游**栈层 schema** 落成 `third_party/ui-ux-pro-max/stacks/lvgl.csv`：
+`Category, Guideline, Description, Do, Don't, Code Good, Code Bad, Severity, Docs URL, Applies To, Status, Verified At`。
+共 **14 条 = 11 条 verified（有真机或代码证据）+ 3 条 needs-verify（来自上游 UX 指南，本板尚未实测）**。
+新增规则请同时改本文件与 `stacks/lvgl.csv`，并在 `Verified At` 写清证据与日期；**没有证据的一律标 needs-verify**。

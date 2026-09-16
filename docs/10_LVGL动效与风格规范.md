@@ -133,6 +133,49 @@ LVGL 的 path 每个动画对象每帧只调一次，一次 320 ms 动效 ≈ 19
 
 ---
 
+## 2.5 【完成记录 2026-09-16】数据层照搬 + LVGL 栈层落地（本轮补齐）
+
+上一轮只交付了"分类骨架"，**数据层从未导入、输出层从未落地**。本轮补齐：
+
+### 2.5.1 数据层：上游真实 CSV 已入库并跑通
+
+- 取件：本机无法直连 github，**走 jsDelivr 镜像**、**固定版本 `2.15.0`**：
+  `https://cdn.jsdelivr.net/gh/nextlevelbuilder/ui-ux-pro-max-skill@2.15.0/.claude/skills/ui-ux-pro-max/<path>`
+  （注意：`skills/...` 路径 404，真实路径在 `.claude/skills/...`）
+- 入库：`third_party/ui-ux-pro-max/`（MIT，含 LICENSE + 取件说明）：`data/{styles,colors,typography,ui-reasoning,ux-guidelines}.csv`
+  + `stacks/{html-tailwind,swiftui}.csv`（仅作结构参考）+ `SKILL.md`
+- 导入实测（`tools/phywear/import_ui_skill.py --in third_party/ui-ux-pro-max/data`）：
+  **styles 88 条**（`Performance` 分布 **cost:low 62 / moderate 19 / high 7**）、**colors 192 行 × 19 角色**、
+  typography 50 KB、ui-reasoning 77 KB、ux-guidelines 28 KB —— 全部完成 RGB565/对比度换算与分档
+
+### 2.5.2 【踩坑并修正】导入器不能"扫整行关键字"
+
+第一版按整行文本判负载，**把 `Dark Mode (OLED)`、`Bento Box Grid`、`Flat Design` 判成了"禁用"**
+（因为它们的 `Do Not Use For` / `Implementation Checklist` 列里出现 shadow/gradient 字样）。
+改为**字段级判定**：只看 `Effects & Animation` + `Performance` + `Complexity` 三列（schema 指纹命中后走快路径）。
+修正后：低负载 38 条、条件可用 10 条、禁用 59 条 —— 与上游自带 `Performance` 字段一致。
+
+### 2.5.3 栈层：新增 `stacks/lvgl.csv`（这是"方向 2_2"的落地形态）
+
+上游架构本是**数据驱动 + 可插拔栈**（`data/stacks/` 下每个技术栈一个 CSV：flutter / html-tailwind / nextjs /
+vue / swiftui / jetpack-compose …）。所以"新增 LVGL 栈"= **新增一个 `stacks/lvgl.csv`**，
+严格沿用上游 schema：`Category, Guideline, Description, Do, Don't, Code Good, Code Bad, Severity, Docs URL, Applies To, Status, Verified At`。
+
+- 文件：`third_party/ui-ux-pro-max/stacks/lvgl.csv`，**14 条规则**
+- 诚实标注：**11 条 `verified`**（附真机或代码证据与日期）+ **3 条 `needs-verify`**（来自上游 UX 指南、本板未实测）
+- 内容全部来自本项目的实测事实：圆角必须 0（EPIC 判据 + 真机 A/B）、渐变仅 2 段 H/V、禁阴影/模糊/变换、
+  图片只走普通混合、5 个位图子集字号（新增中文须重跑 `gen_fonts.sh`）、动效查表不做 PID
+  （真机 151 vs 2088 ns）、图表 10–15 Hz（面板 60 Hz 规格、实测 48–49 FPS）、触控 ≥44×44、>300ms 必须有进度反馈
+
+### 2.5.4 输出层：Skill 已升级为"条目级"，UI 落地仍待批准
+
+`app/phywear/skills/phywear-lvgl-ui.md` 已改为**引用上游实名风格**并给出逐条翻译
+（Flat Design ✅ 默认 / Brutalism ✅ 圆角 0px / Data-Dense / Real-Time Monitoring / **Bento：只取网格、圆角阴影缩放全砍** /
+Neumorphism 等禁用），并指向机器可读的 `stacks/lvgl.csv`；Skill blob 已重新生成（2 个 skill）。
+
+**仍未做（需要你点头，因为改的是用户可见观感）**：按上述 token **实际改某个页面的版式**（建议先挑 1 页做样板：
+用 `colors.csv` 选一套暗色板 → 直角卡片 → 字号层级 → 真机截图 + 帧率确认不退化）。
+
 ## 3. 回退方案
 
 | 层级 | 手段 | 具体 |

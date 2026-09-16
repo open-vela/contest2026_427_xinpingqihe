@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-16 22:52:18",
- "generated_at_epoch": 1789570338,
+ "generated_at": "2026-09-16 23:04:31",
+ "generated_at_epoch": 1789571071,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 202,
   "critical": 125,
-  "bytes": 8943794,
+  "bytes": 8959446,
   "missing_in_workspace": 0
  },
  "files": [
@@ -711,8 +711,8 @@
    "dst": "apps/examples/phywear/pw_skill_blob.c",
    "compare": "exact",
    "critical": true,
-   "md5": "f5ea9c9448a73fede2dc2ffe6e9cf363",
-   "size": 38999,
+   "md5": "2afb6e71996557f81e039856924fbaa9",
+   "size": 43847,
    "present": true
   },
   {
@@ -788,8 +788,8 @@
    "dst": "apps/examples/phywear/skills/phywear-lvgl-ui.md",
    "compare": "exact",
    "critical": true,
-   "md5": "feb4b9ee3156b2b8d69ac26b0f973d0c",
-   "size": 6404,
+   "md5": "23830339a341591f7dd7291e701b01f7",
+   "size": 8463,
    "present": true
   },
   {
@@ -1140,8 +1140,8 @@
    "dst": "tools/phywear/import_ui_skill.py",
    "compare": "exact",
    "critical": true,
-   "md5": "fa5ceebbef0c8885102710779120dbca",
-   "size": 8943,
+   "md5": "b5f5ecb1d28ec5563e5c601fd8e40950",
+   "size": 17688,
    "present": true
   },
   {
