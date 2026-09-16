@@ -23,7 +23,7 @@ CC="${CC:-gcc}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-for f in pw_ahrs.c pw_calib.c pw_traj.c; do
+for f in pw_ahrs.c pw_calib.c pw_traj.c pw_motion.c pw_motion_table.c; do
   if [ ! -f "$APP/$f" ]; then
     echo "找不到算法库：$APP/$f" >&2
     exit 1
@@ -46,6 +46,8 @@ echo "[hosttest] CC=$CC"
   "$APP/pw_ahrs.c" \
   "$APP/pw_calib.c" \
   "$APP/pw_traj.c" \
+  "$APP/pw_motion.c" \
+  "$APP/pw_motion_table.c" \
   -lm
 
 "$TMP/pw_math_hosttest"

@@ -11,13 +11,24 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include <string.h>
 
 #include "pw_ahrs.h"
 #include "pw_calib.h"
+#include "pw_motion.h"
 #include "pw_traj.h"
 
-int main(void)
+int main(int argc, char *argv[])
 {
+  /* 可选：--bench 跑动效查表的计时对照（P1-2 的计算节省量）。
+   * 默认不跑，避免单测时间被计时污染。 */
+
+  if (argc > 1 && strcmp(argv[1], "--bench") == 0)
+    {
+      pw_motion_bench(200000);
+      return 0;
+    }
+
   float err;
   int   rc;
   int   bad = 0;
@@ -47,6 +58,17 @@ int main(void)
   err = -1.0f;
   rc = pw_traj_selftest(&err);
   printf("pw_traj_selftest  rc=%d  max_disp_err=%.4f m          %s\n",
+         rc, (double)err, rc == 0 ? "OK" : "FAIL");
+  if (rc != 0)
+    {
+      bad++;
+    }
+
+  /* 动效查表：端点严格性 + 过冲形态 + 查表/解析一致性 */
+
+  err = -1.0f;
+  rc = pw_motion_selftest(&err);
+  printf("pw_motion_selftest rc=%d  max_err=%.2e                  %s\n",
          rc, (double)err, rc == 0 ? "OK" : "FAIL");
   if (rc != 0)
     {

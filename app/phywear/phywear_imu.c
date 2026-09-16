@@ -30,6 +30,7 @@
 #include "pw_ahrs.h"
 #include "pw_calib.h"
 #include "pw_graph.h"
+#include "pw_motion_lvgl.h"
 #include "pw_traj.h"
 
 /****************************************************************************
@@ -247,6 +248,15 @@ static void imu_set_page(int idx)
   g_i.idx = idx;
   lv_obj_scroll_to_x(g_i.scroller, idx * IMU_PAGE_W, LV_ANIM_OFF);
   imu_sync_dots();
+
+  /* 动效（P1-2）：切到轨迹页时，图形卡用**查表弹簧**滑入。
+   * 只改 y 坐标（几何变化→局部重绘），不碰样式，因此不会落进 SW 变换路径；
+   * 时长 320 ms、单对象，成本有界。想关掉动画就把这一句删掉（或把 path 换回线性）。 */
+
+  if (idx == 4 && g_i.tj_graph != NULL)
+    {
+      pw_motion_slide_in_y(pw_graph_obj(g_i.tj_graph), 18, 320);
+    }
 }
 
 static void imu_arrow_cb(lv_event_t *e)

@@ -63,6 +63,9 @@ if(CONFIG_EXAMPLES_PHYWEAR)
     pw_calib.c
     pw_traj.c
     pw_btprobe.c
+    pw_motion.c
+    pw_motion_table.c
+    pw_motion_lvgl.c
     phywear_imu.c)
 
   # pw_watch.c talks to the AI Agent through its public client API.  The agent

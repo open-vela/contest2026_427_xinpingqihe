@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-16 00:20:11",
- "generated_at_epoch": 1789489211,
+ "generated_at": "2026-09-16 21:10:13",
+ "generated_at_epoch": 1789564213,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 193,
-  "critical": 117,
-  "bytes": 8833972,
+  "files": 201,
+  "critical": 125,
+  "bytes": 8896172,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "5660316e39d0fb3aefcc1af004065b0b",
-   "size": 2406,
+   "md5": "6b3d5876e55b340302e58bc1bd7f6eb9",
+   "size": 2465,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "a4d7782842e8dbcba80813811152df0f",
-   "size": 53788,
+   "md5": "aa235f51bb56b6bc7ee81a3832100b2f",
+   "size": 54041,
    "present": true
   },
   {
@@ -139,8 +139,8 @@
    "dst": "apps/examples/phywear/phywear_imu.c",
    "compare": "exact",
    "critical": true,
-   "md5": "2b614cf3398b47c14f19e00b53a44609",
-   "size": 37603,
+   "md5": "c020904bcbb94df6064fc9ca025d808e",
+   "size": 38063,
    "present": true
   },
   {
@@ -586,6 +586,61 @@
   {
    "rule": "app",
    "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_motion.c",
+   "dst": "apps/examples/phywear/pw_motion.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "6e58d27ff44638dc23a39728e269e928",
+   "size": 7107,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_motion.h",
+   "dst": "apps/examples/phywear/pw_motion.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "a54f3f38f0eccbc56321e8f18c7c156b",
+   "size": 3646,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_motion_lvgl.c",
+   "dst": "apps/examples/phywear/pw_motion_lvgl.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "0974190adfc6605b7e7deb6f1b307f68",
+   "size": 2176,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_motion_lvgl.h",
+   "dst": "apps/examples/phywear/pw_motion_lvgl.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "457002d2d072b5a067c2afa2cf879709",
+   "size": 1268,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_motion_table.c",
+   "dst": "apps/examples/phywear/pw_motion_table.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "010c7c445a53c5c2708f943db5895579",
+   "size": 2811,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
    "snap": "app/phywear/pw_scope.c",
    "dst": "apps/examples/phywear/pw_scope.c",
    "compare": "exact",
@@ -656,8 +711,8 @@
    "dst": "apps/examples/phywear/pw_skill_blob.c",
    "compare": "exact",
    "critical": true,
-   "md5": "5c9be0eb3e466c3bde1b6bf8c48aafa9",
-   "size": 18217,
+   "md5": "f5ea9c9448a73fede2dc2ffe6e9cf363",
+   "size": 38999,
    "present": true
   },
   {
@@ -724,6 +779,17 @@
    "critical": true,
    "md5": "bb5844b7f8ab614c699a82513ea005ff",
    "size": 1787,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/skills/phywear-lvgl-ui.md",
+   "dst": "apps/examples/phywear/skills/phywear-lvgl-ui.md",
+   "compare": "exact",
+   "critical": true,
+   "md5": "feb4b9ee3156b2b8d69ac26b0f973d0c",
+   "size": 6404,
    "present": true
   },
   {
@@ -1037,6 +1103,17 @@
   {
    "rule": "tools",
    "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/gen_motion_table.py",
+   "dst": "tools/phywear/gen_motion_table.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "d52591776bb39db76f38eb58dd695f48",
+   "size": 7597,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
    "snap": "tools/gen_skill_blob.py",
    "dst": "tools/phywear/gen_skill_blob.py",
    "compare": "exact",
@@ -1052,8 +1129,19 @@
    "dst": "tools/phywear/hosttest_math.sh",
    "compare": "exact",
    "critical": true,
-   "md5": "ce9bf6c8b7c0e6374553f4bbeb5bea7c",
-   "size": 1621,
+   "md5": "6f7a618bedcbc8f57d9ef2ce2a233008",
+   "size": 1703,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/import_ui_skill.py",
+   "dst": "tools/phywear/import_ui_skill.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "fa5ceebbef0c8885102710779120dbca",
+   "size": 8943,
    "present": true
   },
   {
@@ -1118,8 +1206,8 @@
    "dst": "tools/phywear/pw_math_hosttest.c",
    "compare": "exact",
    "critical": true,
-   "md5": "55fbb160064f27f1603e212c40bebf3a",
-   "size": 1678,
+   "md5": "2471e540580be4cd972ec43724fac186",
+   "size": 2290,
    "present": true
   },
   {

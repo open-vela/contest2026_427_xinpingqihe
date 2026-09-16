@@ -59,6 +59,7 @@
 #include "phywear_sensors.h"
 #include "phywear_ui.h"
 #include "pw_btprobe.h"
+#include "pw_motion.h"
 #include "pw_ahrs.h"
 #include "pw_calib.h"
 #include "phywear_imu.h"
@@ -880,6 +881,14 @@ int main(int argc, FAR char *argv[])
     {
       cap_screen = argv[2];
       argc = 1;
+    }
+
+  /* 动效计时：查表 vs 解析式（P1-2 的"计算节省量"必须实测） */
+
+  if (argc > 1 && strcmp(argv[1], "motionbench") == 0)
+    {
+      pw_motion_bench((argc > 2) ? atoi(argv[2]) : 20000);
+      return 0;
     }
 
   if (argc > 1 && strcmp(argv[1], "bthci") == 0)
