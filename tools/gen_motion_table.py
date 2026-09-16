@@ -45,15 +45,23 @@ N = 128
 Q = 14                     # Q14 定点
 ONE = 1 << Q               # 1.0
 
-SPRING_ZETA = 0.40
+# P1（2026-09-16）：曲线**分档**，对应上游 motion.csv 的 easing 语义
+#   C1 settle ← power1/2.out      ζ=0.70 ω=12  无过冲，用于按压回位/数值更新/进度
+#   C2 soft   ← back.out(1.4)     ζ=0.45 ω=12  过冲≈20%，用于卡片/宫格入场
+#   C3 bounce ← elastic.out(1,0.4)ζ=0.25 ω=14  过冲≈45%，用于「归零」等明确操作
+#   C4 snap   ← expo.out          ζ=0.90 ω=16  短促干脆，用于即时反馈
+SPRING_TIERS = [("c1", 0.70, 12.0), ("c2", 0.45, 12.0),
+                ("c3", 0.25, 14.0), ("c4", 0.90, 16.0)]
+SPRING_ZETA = 0.45          # 兼容旧引用（= C2）
 SPRING_OMEGA = 12.0
 DECAY_A = 6.0
 DECAY_F = 2.0
 
 
-def spring_raw(u: float) -> float:
-    """欠阻尼二阶阶跃响应（未归一）。"""
-    z, w = SPRING_ZETA, SPRING_OMEGA
+def spring_raw(u: float, z: float = None, w: float = None) -> float:
+    """欠阻尼二阶阶跃响应（未归一）。默认参数 = C2 档（旧行为）。"""
+    z = SPRING_ZETA if z is None else z
+    w = SPRING_OMEGA if w is None else w
     wd = w * math.sqrt(1.0 - z * z)
     return 1.0 - math.exp(-z * w * u) * (
         math.cos(wd * u) + (z * w / wd) * math.sin(wd * u))
@@ -69,6 +77,11 @@ _SPRING_K = 1.0 / spring_raw(1.0)
 
 def spring(u: float) -> float:
     return spring_raw(u) * _SPRING_K
+
+
+def spring_tier(u: float, z: float, w: float) -> float:
+    """分档 spring：按各自的 s(1) 归一化，保证末帧严格 1.0。"""
+    return spring_raw(u, z, w) / spring_raw(1.0, z, w)
 
 
 def decay_raw(u: float) -> float:
@@ -119,7 +132,7 @@ def report(name: str, fn, tab, k=1.0):
     return worst
 
 
-def emit(tab_spring, tab_decay, path):
+def emit(tabs, tab_decay, path):
     body = []
     body.append("/* %s\n"
                 " *\n"
@@ -130,14 +143,21 @@ def emit(tab_spring, tab_decay, path):
                    DECAY_A, DECAY_F, N, Q))
     body.append('#include "pw_motion.h"\n\n')
     body.append("/* 归一化系数：解析式实现（pw_motion.c）引用同一常量，保证与表同一条曲线 */\n")
-    body.append("const float pw_motion_spring_k = %.7ff;\n" % _SPRING_K)
+    for nm, z, w in SPRING_TIERS:
+        body.append("const float pw_motion_%s_zeta = %.4ff;\n" % (nm, z))
+        body.append("const float pw_motion_%s_omega = %.4ff;\n" % (nm, w))
     body.append("const float pw_motion_decay_k  = %.7ff;\n\n" % _DECAY_K)
     body.append("/* u = i/%d，Q%d（1.0 = %d）；spring 有过冲，峰值 ≈ 1.25 */\n"
                 % (N, Q, ONE))
-    body.append("const int16_t pw_motion_tab_spring[PW_MOTION_N] =\n{\n")
-    for i in range(0, N + 1, 8):
-        body.append("  " + ", ".join("%6d" % v for v in tab_spring[i:i + 8]) + ",\n")
-    body.append("};\n\n")
+    for nm, z, w in SPRING_TIERS:
+        tab = tabs[nm]
+        body.append("/* %s: ζ=%.2f ω=%.1f（过冲 %.1f%%） */\n"
+                    % (nm.upper(), z, w, 100.0 * (max(spring_tier(i / 512.0, z, w)
+                                                     for i in range(513)) - 1.0)))
+        body.append("const int16_t pw_motion_tab_%s[PW_MOTION_N] =\n{\n" % nm)
+        for i in range(0, N + 1, 8):
+            body.append("  " + ", ".join("%6d" % v for v in tab[i:i + 8]) + ",\n")
+        body.append("};\n\n")
     body.append("/* 衰减振荡 e^(-%.0fu)·sin(2π·%.0fu)，按峰值归一化到 ±1（Q%d） */\n"
                 % (DECAY_A, DECAY_F, Q))
     body.append("const int16_t pw_motion_tab_decay[PW_MOTION_N] =\n{\n")
@@ -152,18 +172,24 @@ def main():
     ap.add_argument("--check", action="store_true", help="只校验文件是否与曲线一致")
     args = ap.parse_args()
 
-    tab_s, _ = build_table(spring)
+    tabs = {}
+    for nm, z, w in SPRING_TIERS:
+        tabs[nm], _ = build_table(lambda u, z=z, w=w: spring_tier(u, z, w))
+    tab_s = tabs["c2"]
     tab_d, _ = build_table(decay_raw, normalize=True)
 
     print("曲线精度评估（N=%d，Q%d，线性插值）：" % (N, Q))
-    e1 = report("spring", spring, tab_s)
+    e1 = report("spring-C2", spring, tab_s)
+    for nm, z, w in SPRING_TIERS:
+        report("spring-" + nm.upper(),
+               lambda u, z=z, w=w: spring_tier(u, z, w), tabs[nm])
     e2 = report("decay", decay_raw, tab_d, k=1.0 / max(
         abs(decay_raw(i / N)) for i in range(N + 1)))
     print("  → 误差峰值出现在曲率最大处（u≈0 起步段与过冲拐点），属线性插值的固有形态；")
     print("    对 UI 动画的意义：LVGL path 的 0..1024 分辨率下，%.1e 的归一化误差 = %.2f/1024 个步进"
           % (max(e1, e2), max(e1, e2) * 1024))
 
-    src = emit(tab_s, tab_d, OUT)
+    src = emit(tabs, tab_d, OUT)
     if args.check:
         if not os.path.exists(OUT):
             print("❌ 缺少 %s（先不带 --check 跑一次）" % OUT)
@@ -177,8 +203,9 @@ def main():
 
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(src)
-    print("已生成 %s（%d B 源码，编译后表占 flash %d B）"
-          % (OUT, len(src), (N + 1) * 2 * 2))
+    ntab = len(SPRING_TIERS) + 1
+    print("已生成 %s（%d B 源码，编译后 %d 张表占 flash %d B）"
+          % (OUT, len(src), ntab, (N + 1) * 2 * ntab))
     return 0
 
 

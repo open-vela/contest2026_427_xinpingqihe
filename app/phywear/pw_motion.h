@@ -39,6 +39,31 @@
 #  define PW_MOTION_USE_TABLE 1
 #endif
 
+/* 曲线档（对应上游 motion.csv 的 easing 语义，见 third_party/.../data/motion-lvgl.csv）
+ *   C1 settle ← power1/2.out（ζ=0.70，无过冲）  按压回位/数值更新/进度
+ *   C2 soft   ← back.out(1.4)（ζ=0.45，过冲≈20%）卡片/宫格入场
+ *   C3 bounce ← elastic.out（ζ=0.25，过冲≈45%）明确操作回弹
+ *   C4 snap   ← expo.out（ζ=0.90，短促）        即时反馈 */
+
+#define PW_MOTION_TIER_C1  0
+#define PW_MOTION_TIER_C2  1
+#define PW_MOTION_TIER_C3  2
+#define PW_MOTION_TIER_C4  3
+#define PW_MOTION_TIER_N   4
+
+extern const int16_t pw_motion_tab_c1[PW_MOTION_N];
+extern const int16_t pw_motion_tab_c2[PW_MOTION_N];
+extern const int16_t pw_motion_tab_c3[PW_MOTION_N];
+extern const int16_t pw_motion_tab_c4[PW_MOTION_N];
+extern const float   pw_motion_c1_zeta;
+extern const float   pw_motion_c1_omega;
+extern const float   pw_motion_c2_zeta;
+extern const float   pw_motion_c2_omega;
+extern const float   pw_motion_c3_zeta;
+extern const float   pw_motion_c3_omega;
+extern const float   pw_motion_c4_zeta;
+extern const float   pw_motion_c4_omega;
+
 extern const int16_t pw_motion_tab_spring[PW_MOTION_N];
 extern const int16_t pw_motion_tab_decay[PW_MOTION_N];
 
@@ -54,11 +79,15 @@ extern const float pw_motion_decay_k;
  ****************************************************************************/
 
 int32_t pw_motion_spring_q14(uint32_t u1024);
+
+/* 分档取值：tier = PW_MOTION_TIER_C1..C4；越界按 C2 处理 */
+int32_t pw_motion_spring_q14_t(int tier, uint32_t u1024);
 int32_t pw_motion_decay_q14(uint32_t u1024);
 
 /* 解析式实现（始终编译，供对照计时与回退验证） */
 
 int32_t pw_motion_spring_analytic_q14(uint32_t u1024);
+int32_t pw_motion_spring_analytic_q14_t(int tier, uint32_t u1024);
 int32_t pw_motion_decay_analytic_q14(uint32_t u1024);
 
 /****************************************************************************

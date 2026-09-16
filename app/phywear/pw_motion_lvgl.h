@@ -15,8 +15,27 @@
 
 #include <lvgl/lvgl.h>
 
+/* P1 动效总开关（0 = 全关，UI 回到"瞬变"现状）。
+ * 依据 third_party/ui-ux-pro-max/data/motion-lvgl.csv：单次 ≤320ms、只改几何/不透明度、
+ * 不循环、同屏并发 ≤1、禁 transform/圆角/阴影。 */
+
+#ifndef PW_UI_MOTION
+#  define PW_UI_MOTION 1
+#endif
+
 /* 物理弹簧手感（欠阻尼，约 25% 过冲，末帧严格落在 end_value） */
-lv_anim_value_t pw_motion_path_spring(const lv_anim_t *a);
+lv_anim_value_t pw_motion_path_spring(const lv_anim_t *a);      /* = C2（向后兼容） */
+
+/* 分档 path：C1 settle / C2 soft / C3 bounce / C4 snap（语义见 motion-lvgl.csv） */
+lv_anim_value_t pw_motion_path_c1(const lv_anim_t *a);
+lv_anim_value_t pw_motion_path_c2(const lv_anim_t *a);
+lv_anim_value_t pw_motion_path_c3(const lv_anim_t *a);
+lv_anim_value_t pw_motion_path_c4(const lv_anim_t *a);
+
+/* 按压反馈：y 从当前位置动到 base_y+dy（按下 dy=+2，抬起 dy=0），C4 snap。
+ * 只改 y —— 不缩放、不透明度也不动，符合本板约束。 */
+
+void pw_motion_press_y(lv_obj_t *obj, int base_y, int dy, uint32_t dur_ms);
 
 /* 衰减振荡（用于"抖一下"的反馈；末值回到 end_value） */
 lv_anim_value_t pw_motion_path_decay(const lv_anim_t *a);

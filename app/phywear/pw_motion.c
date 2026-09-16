@@ -61,13 +61,31 @@ static int32_t motion_lookup(const int16_t *tab, uint32_t u1024)
   return a + (int32_t)(((b - a) * (int32_t)f) >> 10);
 }
 
-int32_t pw_motion_spring_q14(uint32_t u1024)
+/* 档位 → 查表（越界回 C2，保持与旧版一致） */
+
+static const int16_t *motion_tier_tab(int tier)
+{
+  switch (tier)
+    {
+      case PW_MOTION_TIER_C1: return pw_motion_tab_c1;
+      case PW_MOTION_TIER_C3: return pw_motion_tab_c3;
+      case PW_MOTION_TIER_C4: return pw_motion_tab_c4;
+      default:                return pw_motion_tab_c2;
+    }
+}
+
+int32_t pw_motion_spring_q14_t(int tier, uint32_t u1024)
 {
 #if PW_MOTION_USE_TABLE
-  return motion_lookup(pw_motion_tab_spring, u1024);
+  return motion_lookup(motion_tier_tab(tier), u1024);
 #else
-  return pw_motion_spring_analytic_q14(u1024);
+  return pw_motion_spring_analytic_q14_t(tier, u1024);
 #endif
+}
+
+int32_t pw_motion_spring_q14(uint32_t u1024)
+{
+  return pw_motion_spring_q14_t(PW_MOTION_TIER_C2, u1024);   /* 向后兼容：旧调用点 = C2 */
 }
 
 int32_t pw_motion_decay_q14(uint32_t u1024)
@@ -83,30 +101,40 @@ int32_t pw_motion_decay_q14(uint32_t u1024)
  * 解析式实现（对照与回退用，始终编译）
  ****************************************************************************/
 
-int32_t pw_motion_spring_analytic_q14(uint32_t u1024)
+int32_t pw_motion_spring_analytic_q14_t(int tier, uint32_t u1024)
 {
-  float u;
-  float z = SPRING_ZETA;
-  float w = SPRING_OMEGA;
-  float wd;
-  float s;
+  float z;
+  float w;
+
+  switch (tier)
+    {
+      case PW_MOTION_TIER_C1: z = pw_motion_c1_zeta; w = pw_motion_c1_omega; break;
+      case PW_MOTION_TIER_C3: z = pw_motion_c3_zeta; w = pw_motion_c3_omega; break;
+      case PW_MOTION_TIER_C4: z = pw_motion_c4_zeta; w = pw_motion_c4_omega; break;
+      default:                z = pw_motion_c2_zeta; w = pw_motion_c2_omega; break;
+    }
 
   if (u1024 >= PW_MOTION_RES)
     {
       return PW_MOTION_ONE;
     }
 
-  u = (float)u1024 / (float)PW_MOTION_RES;
-  wd = w * sqrtf(1.0f - z * z);
+  {
+    float u = (float)u1024 / (float)PW_MOTION_RES;
+    float wd = w * sqrtf(1.0f - z * z);
+    float s = 1.0f - expf(-z * w * u) * (cosf(wd * u) +
+                                         (z * w / wd) * sinf(wd * u));
+    float s1 = 1.0f - expf(-z * w) * (cosf(wd) + (z * w / wd) * sinf(wd));
 
-  s = 1.0f - expf(-z * w * u) * (cosf(wd * u) +
-                                (z * w / wd) * sinf(wd * u));
+    s /= s1;                        /* 与表同一套归一化：末帧严格 1.0 */
 
-  /* 与表同一套归一化（系数由生成器输出，见 pw_motion_table.c） */
+    return (int32_t)(s * (float)PW_MOTION_ONE + 0.5f);
+  }
+}
 
-  s *= pw_motion_spring_k;
-
-  return (int32_t)(s * (float)PW_MOTION_ONE + 0.5f);
+int32_t pw_motion_spring_analytic_q14(uint32_t u1024)
+{
+  return pw_motion_spring_analytic_q14_t(PW_MOTION_TIER_C2, u1024);
 }
 
 int32_t pw_motion_decay_analytic_q14(uint32_t u1024)

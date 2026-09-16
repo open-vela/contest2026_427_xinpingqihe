@@ -39,9 +39,64 @@ static lv_anim_value_t motion_path(const lv_anim_t *a, int32_t q14)
 
 lv_anim_value_t pw_motion_path_spring(const lv_anim_t *a)
 {
-  return motion_path(a, pw_motion_spring_q14(
-                       (uint32_t)lv_map(a->act_time, 0, a->duration,
-                                        0, PW_MOTION_RES)));
+  return pw_motion_path_c2(a);
+}
+
+static lv_anim_value_t motion_path_tier(const lv_anim_t *a, int tier)
+{
+  return motion_path(a, pw_motion_spring_q14_t(
+                       tier, (uint32_t)lv_map(a->act_time, 0, a->duration,
+                                              0, PW_MOTION_RES)));
+}
+
+lv_anim_value_t pw_motion_path_c1(const lv_anim_t *a)
+{
+  return motion_path_tier(a, PW_MOTION_TIER_C1);
+}
+
+lv_anim_value_t pw_motion_path_c2(const lv_anim_t *a)
+{
+  return motion_path_tier(a, PW_MOTION_TIER_C2);
+}
+
+lv_anim_value_t pw_motion_path_c3(const lv_anim_t *a)
+{
+  return motion_path_tier(a, PW_MOTION_TIER_C3);
+}
+
+lv_anim_value_t pw_motion_path_c4(const lv_anim_t *a)
+{
+  return motion_path_tier(a, PW_MOTION_TIER_C4);
+}
+
+void pw_motion_press_y(lv_obj_t *obj, int base_y, int dy, uint32_t dur_ms)
+{
+#if PW_UI_MOTION
+  lv_anim_t a;
+
+  if (obj == NULL)
+    {
+      return;
+    }
+
+  if (dur_ms > 320)
+    {
+      dur_ms = 320;                    /* 硬顶：见 motion-lvgl.csv 的 Guard */
+    }
+
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, obj);
+  lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+  lv_anim_set_values(&a, lv_obj_get_y(obj), base_y + dy);
+  lv_anim_set_duration(&a, dur_ms);
+  lv_anim_set_path_cb(&a, pw_motion_path_c4);
+  lv_anim_start(&a);
+#else
+  LV_UNUSED(obj);
+  LV_UNUSED(base_y);
+  LV_UNUSED(dy);
+  LV_UNUSED(dur_ms);
+#endif
 }
 
 lv_anim_value_t pw_motion_path_decay(const lv_anim_t *a)

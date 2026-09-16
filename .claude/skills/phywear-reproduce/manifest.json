@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-16 23:19:13",
- "generated_at_epoch": 1789571953,
+ "generated_at": "2026-09-16 23:24:11",
+ "generated_at_epoch": 1789572251,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 203,
   "critical": 126,
-  "bytes": 8973782,
+  "bytes": 8984774,
   "missing_in_workspace": 0
  },
  "files": [
@@ -370,8 +370,8 @@
    "dst": "apps/examples/phywear/phywear_ui.c",
    "compare": "exact",
    "critical": true,
-   "md5": "764fa8efb4976a5021a625664f9419af",
-   "size": 35910,
+   "md5": "93dfdb1f3459a3f4268ebe68febca315",
+   "size": 36996,
    "present": true
   },
   {
@@ -590,8 +590,8 @@
    "dst": "apps/examples/phywear/pw_motion.c",
    "compare": "exact",
    "critical": true,
-   "md5": "6e58d27ff44638dc23a39728e269e928",
-   "size": 7107,
+   "md5": "97c8ac73ae8ae870643391a4cfd4fa7a",
+   "size": 8175,
    "present": true
   },
   {
@@ -601,8 +601,8 @@
    "dst": "apps/examples/phywear/pw_motion.h",
    "compare": "exact",
    "critical": true,
-   "md5": "a54f3f38f0eccbc56321e8f18c7c156b",
-   "size": 3646,
+   "md5": "3281ecd7a2fcd726804402578344ed22",
+   "size": 4948,
    "present": true
   },
   {
@@ -612,8 +612,8 @@
    "dst": "apps/examples/phywear/pw_motion_lvgl.c",
    "compare": "exact",
    "critical": true,
-   "md5": "0974190adfc6605b7e7deb6f1b307f68",
-   "size": 2176,
+   "md5": "c920164ce1155c341222609ecf4d6200",
+   "size": 3364,
    "present": true
   },
   {
@@ -623,8 +623,8 @@
    "dst": "apps/examples/phywear/pw_motion_lvgl.h",
    "compare": "exact",
    "critical": true,
-   "md5": "457002d2d072b5a067c2afa2cf879709",
-   "size": 1268,
+   "md5": "7f110acc8015a9c16e44fd4105903e64",
+   "size": 2168,
    "present": true
   },
   {
@@ -634,8 +634,8 @@
    "dst": "apps/examples/phywear/pw_motion_table.c",
    "compare": "exact",
    "critical": true,
-   "md5": "010c7c445a53c5c2708f943db5895579",
-   "size": 2811,
+   "md5": "a970b6c0365e0a9d04c9337075ffc815",
+   "size": 6626,
    "present": true
   },
   {
@@ -1118,8 +1118,8 @@
    "dst": "tools/phywear/gen_motion_table.py",
    "compare": "exact",
    "critical": true,
-   "md5": "d52591776bb39db76f38eb58dd695f48",
-   "size": 7597,
+   "md5": "e2342fb014c792c9f44941912ca3bad9",
+   "size": 9230,
    "present": true
   },
   {

@@ -42,6 +42,7 @@
 #include "phywear_imu.h"
 #include "phywear_i18n.h"
 #include "pw_graph.h"
+#include "pw_motion_lvgl.h"
 #include "phywear_raw.h"
 #include "phywear_pend.h"
 #include "phywear_spec.h"
@@ -198,6 +199,18 @@ static void ui_back_cb(lv_event_t *e)
 /****************************************************************************
  * Name: ui_tile_cb
  ****************************************************************************/
+
+/* P1 动效：tile 按压反馈（按下 y+2px，抬起回位；C4 snap 150ms）。
+ * 只动 y 一个属性；user_data 传 tile 的基准 y（与 CLICKED 的 user_data 各用一套）。 */
+
+static void ui_tile_press_cb(lv_event_t *e)
+{
+  lv_obj_t *o = lv_event_get_target(e);
+  int base = (int)(intptr_t)lv_event_get_user_data(e);
+  int dy = (lv_event_get_code(e) == LV_EVENT_PRESSED) ? 2 : 0;
+
+  pw_motion_press_y(o, base, dy, 150);
+}
 
 static void ui_tile_cb(lv_event_t *e)
 {
@@ -1053,6 +1066,18 @@ void pw_ui_root(void)
       lv_obj_set_style_bg_color(tile, PW_COL_CARD_LT, LV_STATE_PRESSED);
       lv_obj_add_event_cb(tile, ui_tile_cb, LV_EVENT_CLICKED,
                           (void *)b->open);
+#if PW_UI_MOTION
+      /* 按压反馈：按下/抬起/滑出都处理；EVENT_BUBBLE 让点在子控件（图标/文字）
+       * 上也能冒泡到 tile，否则按在图标上不会有反馈。 */
+
+      lv_obj_add_flag(tile, LV_OBJ_FLAG_EVENT_BUBBLE);
+      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_PRESSED,
+                          (void *)(intptr_t)y);
+      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_RELEASED,
+                          (void *)(intptr_t)y);
+      lv_obj_add_event_cb(tile, ui_tile_press_cb, LV_EVENT_PRESS_LOST,
+                          (void *)(intptr_t)y);
+#endif
 
       /* 板块图标：淡色圆底 + LV_SYMBOL 字形（内置 Montserrat 已含 symbols，
        * 不必重生成中文字体子集；字色用板块色，视觉上仍是"一区一色"） */
