@@ -44,4 +44,18 @@ lv_anim_value_t pw_motion_path_decay(const lv_anim_t *a);
  * 只改 y 坐标（几何变化 → 局部重绘），不动样式，不触发 SW 变换路径。 */
 void pw_motion_slide_in_y(lv_obj_t *obj, int from_dy, uint32_t dur_ms);
 
+/* 同上，但可指定起始延时（用于宫格/列表逐项错峰；延时只排队不并发） */
+void pw_motion_slide_in_y_at(lv_obj_t *obj, int from_dy,
+                             uint32_t dur_ms, uint32_t delay_ms);
+
+/* 通用按压反馈：按下 y+dy(90ms C4)，抬起回到 base_y(160ms C4)。
+ * base_y 由调用方在建对象时给出（这些按钮不会被别处移动）→ 无需存状态。 */
+void pw_motion_press_feedback(lv_obj_t *obj, int base_y, int dy);
+
+/* 归零/重置回弹：base_y+amp → base_y，C3 轻弹一次（≤320ms） */
+void pw_motion_settle_y(lv_obj_t *obj, int base_y, int amp, uint32_t dur_ms);
+
+/* 状态点脉冲：不透明 100%→40%→100%，一次性不循环（点状小对象专用） */
+void pw_motion_pulse_opa(lv_obj_t *obj, uint32_t dur_ms);
+
 #endif /* __APPS_EXAMPLES_PHYWEAR_MOTION_LVGL_H */

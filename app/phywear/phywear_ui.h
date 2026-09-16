@@ -47,11 +47,15 @@ struct pw_graph_s;   /* 前向声明，避免强依赖 pw_graph.h */
 
 /* ---- 主题 ---- */
 
-#define PW_COL_BG       lv_color_hex(0x101418)  /* 深色底 */
-#define PW_COL_CARD     lv_color_hex(0x1a222c)  /* 卡片底 */
-#define PW_COL_CARD_LT  lv_color_hex(0x26333f)  /* 卡片高亮（按压） */
-#define PW_COL_TEXT     lv_color_white()
-#define PW_COL_DIM      lv_color_hex(0x8a97a5)  /* 次级文字 */
+/* 色板来源：third_party/ui-ux-pro-max/data/colors-lvgl.csv
+ * （上游 Product Type = Smart Home/IoT Dashboard 的 Slate 暗色档，已转 RGB565 并核对对比度：
+ *   TEXT/BG 17.06:1、DIM/BG 6.96:1、CARD/BG 1.14:1、BORDER/BG 2.36:1） */
+
+#define PW_COL_BG       lv_color_hex(0x0F172A)  /* 深色底（colors.csv Background） */
+#define PW_COL_CARD     lv_color_hex(0x1B2336)  /* 卡片底（colors.csv Card） */
+#define PW_COL_CARD_LT  lv_color_hex(0x272F42)  /* 卡片高亮/按压（colors.csv Muted） */
+#define PW_COL_TEXT     lv_color_hex(0xF8FAFC)
+#define PW_COL_DIM      lv_color_hex(0x94A3B8)  /* 次级文字（colors.csv Muted Foreground，6.96:1） */
 #define PW_COL_FAINT    lv_color_hex(0x5b6875)  /* 禁用/占位文字 */
 
 /* 板块强调色 */
@@ -83,7 +87,7 @@ struct pw_graph_s;   /* 前向声明，避免强依赖 pw_graph.h */
 #define PW_ACC_ACTIVE   lv_color_hex(0xff9a3d)
 
 /* 图表网格/刻度线（暗底低干扰） */
-#define PW_COL_GRID     lv_color_hex(0x3a4550)
+#define PW_COL_GRID     lv_color_hex(0x475569)  /* 网格/描边（colors.csv Border） */
 
 /* 常用字体快捷宏。
  * BODY..XL = PhyWear 合并字体 pw_font_*（Montserrat Latin + Droid CJK 子集，

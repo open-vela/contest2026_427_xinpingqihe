@@ -49,6 +49,7 @@
 #include "pw_analysis.h"
 #include "phywear_time.h"
 #include "phywear_i18n.h"
+#include "pw_motion_lvgl.h"
 
 /****************************************************************************
  * Private Definitions
@@ -501,6 +502,7 @@ static void time_th_build_row(lv_obj_t *parent, int y)
   lv_obj_set_pos(btn, 170, y + 18);
   lv_obj_add_event_cb(btn, time_th_step_cb, LV_EVENT_CLICKED,
                       (void *)&delta_m1);
+  pw_motion_press_feedback(btn, y + 18, 2);
   lab = pw_label_new(btn, "-", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
 
@@ -511,6 +513,7 @@ static void time_th_build_row(lv_obj_t *parent, int y)
   lv_obj_set_pos(btn, 308, y + 18);
   lv_obj_add_event_cb(btn, time_th_step_cb, LV_EVENT_CLICKED,
                       (void *)&delta_p1);
+  pw_motion_press_feedback(btn, y + 18, 2);
   lab = pw_label_new(btn, "+", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
 }
@@ -678,6 +681,7 @@ static void time_build_page_timer(void)
   btn = pw_card_new(pg, 160, 48, PW_COL_CARD_LT);
   lv_obj_set_pos(btn, 115, 280);
   lv_obj_add_event_cb(btn, time_clear_cb, LV_EVENT_CLICKED, NULL);
+  pw_motion_press_feedback(btn, 280, 2);
   lab = pw_label_new(btn, PW_STR(TIME_CLEAR), PW_FNT_MED, PW_COL_DIM);
   lv_obj_center(lab);
 }

@@ -563,6 +563,9 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
       row = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 76,
                         PW_COL_CARD);
       lv_obj_set_pos(row, MENU_X0, y);
+#if PW_UI_MOTION
+      pw_motion_slide_in_y_at(row, 10, 280, (uint32_t)i * 50);
+#endif
       lv_obj_set_style_bg_color(row, PW_COL_CARD_LT, LV_STATE_PRESSED);
 
       if (ok)

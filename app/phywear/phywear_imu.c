@@ -233,6 +233,10 @@ static void imu_sync_dots(void)
       lv_obj_set_style_bg_color(g_i.dots[i],
                                 (i == g_i.idx) ? PW_ACC_RAW : PW_COL_CARD_LT,
                                 0);
+      if (i == g_i.idx)
+        {
+          pw_motion_pulse_opa(g_i.dots[i], 220);   /* ④ 状态点脉冲（一次性） */
+        }
     }
 }
 
@@ -874,6 +878,7 @@ static void imu_button(lv_obj_t *parent, int x, int y, int w, int h,
 
   lv_obj_set_pos(btn, x, y);
   lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
+  pw_motion_press_feedback(btn, y, 3);
 
   lab = pw_label_new(btn, text, PW_FNT_MED, PW_COL_TEXT);
   lv_obj_center(lab);
@@ -1105,7 +1110,7 @@ static void imu_traj_push(float x, float y)
 
 static void imu_traj_reset_cb(lv_event_t *e)
 {
-  (void)e;
+  lv_obj_t *btn = lv_event_get_target(e);
 
   if (g_i.traj == NULL)
     {
@@ -1119,6 +1124,9 @@ static void imu_traj_reset_cb(lv_event_t *e)
 
   pw_graph_set_data(g_i.tj_graph, g_i.tjx, g_i.tjy, 0);
   imu_traj_labels();
+
+  /* ③ 归零回弹：按钮轻弹一次（C3），告知"已经清零" */
+  pw_motion_settle_y(btn, 0, 3, 260);   /* 该按钮建在 y=0；先清抬起动画再弹 */
 }
 
 static void imu_build_traj(void)
