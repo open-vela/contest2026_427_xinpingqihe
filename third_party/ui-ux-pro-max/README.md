@@ -40,6 +40,21 @@ ja 早期镜像路径（备用）：https://cdn.jsdelivr.net/gh/nextlevelbuilder
 | `stacks/lvgl.csv` | 本队新增 | **LVGL 栈**：14 条规则（11 verified + 3 needs-verify），本板实测事实的机器可读版 |
 | `SKILL.md` | 16 KB | 上游 Skill 定义（用于对齐我们 LVGL 版的结构） |
 
+## 【LVGL 适配层】本队生成的 4 个原生数据文件（2026-09-16）
+
+上游数据是**给浏览器写的**（hover/scroll 触发、GSAP easing、GSAP 片段列、Google Fonts 配对、web 页面类型），
+只做文档级映射不算适配。故新增生成器 `tools/phywear/gen_lvgl_adapt.py`，
+**从上游数据可复现地**产出 4 个 LVGL 原生文件（映射表写在脚本里，`--check` 防漂移）：
+
+| 文件 | 行数 | 内容 |
+|---|---|---|
+| `data/motion-lvgl.csv` | 17（**保留 13 / 裁掉 4**） | 触发翻译（hover→press、scroll→页面进入、错峰入场、内容层切换）· 曲线档 **C1 settle / C2 soft / C3 bounce / C4 snap / D1 pulse** · 时长（≤320 ms 封顶）· 属性（y/不透明度，**禁 transform**）· 守卫（不循环/并发 1）· `Source Row` 指回上游 |
+| `data/colors-lvgl.csv` | 39 | 4 个选定 Product Type × 角色 → **RGB565** + 对背景对比度 + 可用性结论 + 本仓 token（强调色只取上游 `Accent`；`Primary/Secondary` 在暗色档里是深色块，实测对比度 1.22，标"（未采用）"） |
+| `data/typography-lvgl.csv` | 74 | 上游字体配对 → **本板 5 档位图字号**的层级映射（字体名与 Google Fonts URL 丢弃） |
+| `data/ui-reasoning-lvgl.csv` | 10 | 上游 192 个 web 页面类型 → **本仓 10 个页面**（主屏/主页宫格/工具板/读数/图表/轨迹/秒表/声学/AI 日志/设置）→ 风格档 + 色板 + 字号 + 密度 + 动效档 |
+
+生成/校验：`python3 tools/phywear/gen_lvgl_adapt.py [--check]`（默认读写参赛仓内数据目录，可用 `--data` 覆盖）。
+
 ## 统计（导入实测，2026-09-16）
 
 - `styles.csv`：**88 条**；自带 `Performance` 分布 **cost:low 62 / cost:moderate 19 / cost:high 7**
