@@ -29,8 +29,8 @@
 | ③ 惯性标尺（**放「工具」板块**，用户 2026-09-15 已定） | 代码核心已交付并三层验证（`docs/evidence/imu-ahrs-20260915/`）：`pw_ahrs`（Mahony MARG，状态 76 B）+ `pw_calib`（六面法/磁椭球/陀螺零偏，全流式充分统计）+ 主机单测 `tools/phywear/hosttest_math.sh` + 真机无头入口 `phywear ahrs/calib`。真机实测：AHRS 与加速度计解算倾角一致 ~0.5°；mag 开后 yaw 稳定不漂。**精度指标仍无转台真值**；磁软铁只能定到一个未知旋转 |
 | ⚠️ SRAM 现状（2026-09-16 更新） | 蓝牙阶段 A 打开 `UART_BTH4` 后 **487,460 B（92.98%）**；g_allsyms 的 **−45,952 B** 仍在（否则会是 98%+）：把只读符号表 `g_allsyms` 由 `.data` 改 `const` 放 flash（`nuttx/tools/mkallsyms.py` 两处；实测 **−45,952 B**、flash 不变、panic 符号解析保留）。现比最初基线**低约 43 KB**，蓝牙所需 ~41 KB 也因此有余量 |
 | ⑤-1 主动场景 | 已打通并真机验证（`docs/evidence/proactive-20260915/`）：晃表 → Agent 自动跑单摆实验 → 结果进手表 AI 日志。修掉两个真崩溃（message_bus 未初始化时 push 断言、工具 cJSON 双重释放）；补上 `ai_agent` 开机自启（板级 `etc/init.d/rc.sysinit`）。**待用户挥手确认"真实摆动 → 可信 g"**；三道有效性门有残余漏过（70s 内 1 条），根治需改单摆页运动判据 |
-| 真机固件 | 板上 `2e00ecf22243b0bc942c3933f77f6660`（**2,204,456 B** / SRAM **487,460 B（92.98%）** / flash 13.14%）；最新构建为 **2,206,056 B（13.15%，md5 `0c9f8e90…`）含动效查表**（待烧，因板子 09-16 从 USB 掉线暂未烧）；含 allsyms→flash、mag/light oneshot、+2 条离线意图；⚠️ 固件**非可重现构建**（镜像嵌构建时间），md5 只在「板上 vs 同一产物」时有意义；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
-| 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— 09-15 22:1x 短暂掉线后恢复；**09-16 烧录时再次掉线，`lsusb` 里 CH340 已消失（需人工重新插拔）**，故动效真机计时与 A/B 待补 |
+| 真机固件 | 板上 `0c9f8e90574cad28fba6f33a7b980f06`（**2,206,056 B** / SRAM **487,460 B（92.98%）** / flash 13.15%），读回比对通过；含蓝牙阶段 A（`/dev/ttyHCI0` + HCI 探针）与 P1-2 动效查表（真机 `motionbench` 151 vs 2088 ns/次）；含 allsyms→flash、mag/light oneshot、+2 条离线意图；⚠️ 固件**非可重现构建**（镜像嵌构建时间），md5 只在「板上 vs 同一产物」时有意义；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
+| 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— 09-15 22:1x 短暂掉线后恢复；09-16 21:08 重新插拔后恢复，动效真机计时与截图验证已补齐（`docs/evidence/motion-20260916/`） |
 | AI 日志 | `logs/XPQHyue/` **50 会话 / 15,283 事件**，`validate-log.py` ✅ ALL OK |
 | 回退点 | `~/桌面/PhyWear-rollback-20260915-0002/`（含改动前固件 `484b64ca…`，本批真机 A/B 用的就是它；`rollback.sh --check`） |
 | 迁移包 | `~/桌面/PhyWear-migrate-20260914.zip` |
