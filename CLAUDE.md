@@ -25,6 +25,7 @@
 | 本地领先官方 | **11+ 个提交攒在本地**（以 `submit_427.sh --status` 为准，此表不追自增计数） |
 | 官方仓分支 | `a83ad3e686d1`（PR #11/#12/#13 已合并） |
 | 待合并 PR | **#14**（已推送、`mergeable=true/clean`、7 提交：MiMo 的 JUDGES.md + 协作记忆 + 打包修复 + 规则 S14）；按新策略可留到完结一起合 |
+| **动效×风格 整合方案（2026-09-16，待执行）** | 用户目标定为「**帧率不变前提下营造高级感**」；上游 main 分支 zip 已**全量入库**（13 个数据 CSV 含 **`motion.csv` 17 条动效库**、22 个栈、5 个脚本，2.6 MB；核心文件与 2.15.0 镜像逐字节一致）。方案见 `docs/12_动效与风格整合方案.md`：动效触发翻译（hover→press、scroll→页面进入、裁掉滚动/轮播）+ 5 档曲线（power/back/elastic/expo/sine → C1 settle/C2 soft/C3 bounce/C4 snap/D1 pulse）+ 时长规范（取上游再收敛到 320 ms 硬顶）+ 8 处接入分两批 + 风格体系（页面类型→实名风格→色板→字号→密度）+ 三阶段落地与逐项开关。**待用户批准后执行** |
 | **UI/UX Skill 规划：本轮补齐（2026-09-16）** | 数据层**已照搬入库**：`third_party/ui-ux-pro-max/`（上游 v2.15.0，jsDelivr 镜像取件，MIT，5 个数据 CSV + 2 参考栈）；导入实测 styles **88 条**（cost:low 62 / moderate 19 / high 7）、colors 192×19；**新增栈层 `stacks/lvgl.csv`**（14 条：11 verified + 3 needs-verify）；Skill 升级为**上游实名 + 逐条翻译**。修正一个真 bug：导入器原按整行扫关键字，把 Dark Mode (OLED)/Bento/Flat 误判为禁用 → 改字段级判定。**UI 实际改版（输出层）仍待批准**，见 `docs/10 §2.5` |
 | LVGL 官方跑分（2026-09-16） | **全场景平均 39 FPS / CPU 83% / render 22 ms / flush 0**；轻场景天花板 **56~63 FPS**；重场景 CPU 光栅瓶颈（满屏文字 15 FPS / 58 ms）。入口 `phywear lvbench`（demos 进固件 +278 KB）；证据 `docs/evidence/lvbench-20260916/` |
 | **面板帧率上限已定案（2026-09-16）** | CO5300AF-01 手册（V0.00）核实：**VFR = 60 Hz（Typ）**，命令表 7.4 **无任何帧率控制寄存器**（无 C6h）⇒ 60 Hz 是硬上限，实测量 56~63 FPS 与规格吻合；用户目标"60 以上"在此屏上**物理不可达**。TE 支持（35h/34h/44h/**45h 读扫描行**）但板级 pinmux 无 TE 走线。**剩余唯一软件杠杆 = 主机侧 ~4 ms/帧**（20.8 ms vs 16.7 ms）。见 `docs/11` |

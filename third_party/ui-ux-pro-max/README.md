@@ -2,14 +2,16 @@
 
 **来源**：<https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>，**MIT**（见同目录 `LICENSE`）。
 **版本**：`2.15.0`（jsDelivr 缓存包的最新稳定版）。
-**取件方式**（本机无法直连 github，走 jsDelivr 镜像；注意真实路径在 `.claude/skills/` 下，
-`skills/...` 路径会 404）：
+**取件方式**：**用户提供的 main 分支压缩包** `ui-ux-pro-max-skill-main.zip`（2026-09-16 下载），
+已全量解包入库；早期 5 个核心数据文件曾用 jsDelivr 镜像（固定版本 2.15.0）取回，
+**与 zip 内同名文件逐字节一致**（以 `styles.csv` 为例：149,478 B / 89 行，md5 相同），故两来源等价。
 
 ```
-https://cdn.jsdelivr.net/gh/nextlevelbuilder/ui-ux-pro-max-skill@2.15.0/.claude/skills/ui-ux-pro-max/<path>
+ja 早期镜像路径（备用）：https://cdn.jsdelivr.net/gh/nextlevelbuilder/ui-ux-pro-max-skill@2.15.0/.claude/skills/ui-ux-pro-max/<path>
+   注意：`skills/...` 路径会 404，真实路径在 `.claude/skills/` 下
 ```
 
-取件日期：2026-09-16。
+入库日期：2026-09-16。
 
 ## 为什么把数据落进参赛仓
 
@@ -27,6 +29,12 @@ https://cdn.jsdelivr.net/gh/nextlevelbuilder/ui-ux-pro-max-skill@2.15.0/.claude/
 | `data/typography.csv` | 50 KB | 字体配对（Heading/Body + Google Fonts URL，后者本板裁掉） |
 | `data/ui-reasoning.csv` | 77 KB | 推理规则（UI_Category → Recommended_Pattern / Style_Priority / Decision_Rules） |
 | `data/ux-guidelines.csv` | 28 KB | UX 指南（Do/Don't/Severity） |
+| **`data/motion.csv`** | 17 条 | **动效库**（Category/Intensity Tier/Trigger/Duration/Easing/Performance Notes）—— 本队动效体系的直接依据 |
+| `data/app-interface.csv` | 32 条 | 移动端界面问题（触屏相关条目并入 Skill） |
+| `data/charts.csv` | — | 图表选型与可访问性（仅取实时曲线相关） |
+| `data/google-fonts.csv`、`data/icons.csv`、`data/landing.csv`、`data/products.csv`、`data/react-performance.csv` | — | **裁掉**（Web 专属或本板无场景），保留仅为完整性与可追溯 |
+| `data/stacks/*.csv` | 22 个 | 上游各技术栈（flutter/vue/swiftui/uno/jetpack-compose…），**仅作结构与 Severity 约定对照** |
+| `scripts/*.py` | 5 个 | 上游引擎（core/design_system/search/reasoning_contract/validate_data），需要时离线用于"选风格" |
 | `stacks/html-tailwind.csv` | 17 KB | **仅参考**：上游栈层 CSV 的结构样例（内容不采纳） |
 | `stacks/swiftui.csv` | 15 KB | **仅参考**：原生 GUI 栈样例（离嵌入式最近，但仍非 LVGL） |
 | `stacks/lvgl.csv` | 本队新增 | **LVGL 栈**：14 条规则（11 verified + 3 needs-verify），本板实测事实的机器可读版 |
