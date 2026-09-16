@@ -386,6 +386,15 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   return cont;
 }
 
+/* P0：卡片圆角。**EPIC 不支持圆角** —— lv_draw_sifli_epic.c 的 FILL/BORDER 分支里
+ * `if(radius != 0) return 0;`，即任何带圆角的填充/边框都会回退到 CPU 软件光栅（掩码+混合）。
+ * 默认 0（走 EPIC 直通）；要看"圆角到底吃多少帧率"就把这里改回 14 做同口径 A/B。 */
+
+#ifndef PW_CARD_RADIUS
+#  define PW_CARD_RADIUS 14   /* P0 A/B 实测：改 0 在实时页/轨迹页都测不到收益（34/36、10/11 完全相同），
+                               * 故保留观感。宏留着当实验旋钮，见 docs/evidence/p0-20260916/ */
+#endif
+
 lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg)
 {
   lv_obj_t *card = lv_obj_create(parent);
@@ -394,7 +403,7 @@ lv_obj_t *pw_card_new(lv_obj_t *parent, int w, int h, lv_color_t bg)
   lv_obj_set_style_bg_color(card, bg, 0);
 
   lv_obj_set_style_border_width(card, 0, 0);
-  lv_obj_set_style_radius(card, 14, 0);
+  lv_obj_set_style_radius(card, PW_CARD_RADIUS, 0);
   lv_obj_set_style_pad_all(card, 0, 0);
   lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 

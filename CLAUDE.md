@@ -25,11 +25,12 @@
 | 本地领先官方 | **11+ 个提交攒在本地**（以 `submit_427.sh --status` 为准，此表不追自增计数） |
 | 官方仓分支 | `a83ad3e686d1`（PR #11/#12/#13 已合并） |
 | 待合并 PR | **#14**（已推送、`mergeable=true/clean`、7 提交：MiMo 的 JUDGES.md + 协作记忆 + 打包修复 + 规则 S14）；按新策略可留到完结一起合 |
+| P0 首轮（2026-09-16） | ✅ 主循环自适应休眠（`PW_LOOP_SLEEP_MAX_MS`，+30.8%）；❌ 圆角 14→0 **零增益**（保留 14）；**𠆊正**「每帧全屏推屏」误判（`fb_flush_start` 用的是脏区 `fb_clip`）。证据 `docs/evidence/p0-20260916/`，详见 `docs/03 §4.12` |
 | 下一步任务（2026-09-16 追加） | 蓝牙阶段 A ✅（HCI 通，host 栈属阶段 B）；③ 轨迹页 ✅（真机静置不漂/推停循环，手推真值待人工）；P1-2 动效查表 + LVGL 版 Skill ✅（`docs/10`，真机计时待补）。原六项：**② ✅ → ① ✅ → ⑤-1 ✅ → ③ 🔶 算法核心 + UI 已交付（主页入口未接）→ ④ ✅ 探针（no-go）→ 视频 🔶 脚本 v4 + 分镜表已交付，成片待实拍**。③ 剩：板块归属（生活/工具）→ 接 tile 一行、真值测量（六面/磁/二维）。**视频成片需人拍**（真机无视频输出、模拟器 0.3 fps、无 ffmpeg） |
 | ③ 惯性标尺（**放「工具」板块**，用户 2026-09-15 已定） | 代码核心已交付并三层验证（`docs/evidence/imu-ahrs-20260915/`）：`pw_ahrs`（Mahony MARG，状态 76 B）+ `pw_calib`（六面法/磁椭球/陀螺零偏，全流式充分统计）+ 主机单测 `tools/phywear/hosttest_math.sh` + 真机无头入口 `phywear ahrs/calib`。真机实测：AHRS 与加速度计解算倾角一致 ~0.5°；mag 开后 yaw 稳定不漂。**精度指标仍无转台真值**；磁软铁只能定到一个未知旋转 |
 | ⚠️ SRAM 现状（2026-09-16 更新） | 蓝牙阶段 A 打开 `UART_BTH4` 后 **487,460 B（92.98%）**；g_allsyms 的 **−45,952 B** 仍在（否则会是 98%+）：把只读符号表 `g_allsyms` 由 `.data` 改 `const` 放 flash（`nuttx/tools/mkallsyms.py` 两处；实测 **−45,952 B**、flash 不变、panic 符号解析保留）。现比最初基线**低约 43 KB**，蓝牙所需 ~41 KB 也因此有余量 |
 | ⑤-1 主动场景 | 已打通并真机验证（`docs/evidence/proactive-20260915/`）：晃表 → Agent 自动跑单摆实验 → 结果进手表 AI 日志。修掉两个真崩溃（message_bus 未初始化时 push 断言、工具 cJSON 双重释放）；补上 `ai_agent` 开机自启（板级 `etc/init.d/rc.sysinit`）。**待用户挥手确认"真实摆动 → 可信 g"**；三道有效性门有残余漏过（70s 内 1 条），根治需改单摆页运动判据 |
-| 真机固件 | 板上 `0c9f8e90574cad28fba6f33a7b980f06`（**2,206,056 B** / SRAM **487,460 B（92.98%）** / flash 13.15%），读回比对通过；含蓝牙阶段 A（`/dev/ttyHCI0` + HCI 探针）与 P1-2 动效查表（真机 `motionbench` 151 vs 2088 ns/次）；含 allsyms→flash、mag/light oneshot、+2 条离线意图；⚠️ 固件**非可重现构建**（镜像嵌构建时间），md5 只在「板上 vs 同一产物」时有意义；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
+| 真机固件 | 板上 `b155d6cf187a5f8803007744a7896a5c`（**2,206,088 B** / SRAM **487,460 B（92.98%）** / flash 13.15%）；含蓝牙阶段 A、P1-2 动效查表（真机 151 vs 2088 ns/次）、**P0 主循环自适应休眠（实时页 fps 26/28 → 34/36）**；含 allsyms→flash、mag/light oneshot、+2 条离线意图；⚠️ 固件**非可重现构建**（镜像嵌构建时间），md5 只在「板上 vs 同一产物」时有意义；上一版 `484b64ca2e9cd157a191f8ea7d022f9a` 留档在 `~/桌面/PhyWear-rollback-20260915-0002/firmware/` |
 | 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— 09-15 22:1x 短暂掉线后恢复；09-16 21:08 重新插拔后恢复，动效真机计时与截图验证已补齐（`docs/evidence/motion-20260916/`） |
 | AI 日志 | `logs/XPQHyue/` **50 会话 / 15,283 事件**，`validate-log.py` ✅ ALL OK |
 | 回退点 | `~/桌面/PhyWear-rollback-20260915-0002/`（含改动前固件 `484b64ca…`，本批真机 A/B 用的就是它；`rollback.sh --check`） |

@@ -51,6 +51,13 @@
 
 #include <lvgl/lvgl.h>
 
+/* P0：主循环休眠上限（ms）。10 = 改动前的固定行为；1~2 = 低延迟模式。
+ * 可回退开关：改回 10 即完全恢复原状。 */
+
+#ifndef PW_LOOP_SLEEP_MAX_MS
+#  define PW_LOOP_SLEEP_MAX_MS 2
+#endif
+
 #include <nuttx/input/touchscreen.h>
 #include <nuttx/sensors/lsm6dsl.h>
 #include <nuttx/sensors/mmc5603.h>
@@ -89,6 +96,7 @@ static int             g_fps_fd = -1;
 static unsigned char  *g_fps_mem;
 static size_t          g_fps_frame;     /* 单帧字节数 */
 static volatile uint32_t g_fps_cnt;
+static volatile uint32_t g_loop_next_ms;   /* LVGL 建议的下次休眠上限（ms） */
 
 
 /* 计帧：挂 LVGL 显示事件，而不是替换 flush 回调。
@@ -1590,9 +1598,19 @@ int main(int argc, FAR char *argv[])
         struct timespec tn;
         struct timespec dn;
 
-        lv_timer_handler();
-        loop++;
-        alive_frames++;
+        /* P0：用 LVGL 自己给出的"下次定时器还有多久"来休眠，而不是固定 10 ms。
+         * 动机：固定 10 ms 会给每一帧叠加最多 10 ms 的处理延迟（在 35 ms/帧的
+         * 实时页上占 ~30%）。LVGL 的 lv_timer_handler() 返回距下一个定时器的毫秒数，
+         * 拿它当休眠上限即可"该睡就睡、该画就画"。
+         * 回退：把 PW_LOOP_SLEEP_MAX_MS 设成 10 即恢复原来的固定 10 ms 行为。 */
+
+        {
+          uint32_t nxt = lv_timer_handler();
+
+          loop++;
+          alive_frames++;
+          g_loop_next_ms = nxt;
+        }
 
         {
           struct timespec an;
@@ -1736,7 +1754,24 @@ int main(int argc, FAR char *argv[])
             loop = 0;
           }
 
-        usleep(10 * 1000);   /* ~100Hz 轮询，界面动画/触摸流畅 */
+        /* 休眠：不超过 PW_LOOP_SLEEP_MAX_MS，也不超过 LVGL 说的"下次还有多久"。
+         * 下限 1 ms：避免空转把 CPU 吃满（本板还有 50 Hz 采样线程要跑）。 */
+
+        {
+          uint32_t slp = g_loop_next_ms;
+
+          if (slp > PW_LOOP_SLEEP_MAX_MS)
+            {
+              slp = PW_LOOP_SLEEP_MAX_MS;
+            }
+
+          if (slp < 1)
+            {
+              slp = 1;
+            }
+
+          usleep(slp * 1000);
+        }
       }
 
     pw_ai_set_gui_running(false);
