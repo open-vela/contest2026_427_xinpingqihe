@@ -64,7 +64,8 @@
 #endif
 
 #ifndef PW_LOOP_SLEEP_MAX_MS
-#  define PW_LOOP_SLEEP_MAX_MS 2
+#  define PW_LOOP_SLEEP_MAX_MS 2   /* A/B 实测：0（忙等）与 2 ms 的 fps 完全相同（48~49），
+                                     * 故取 2 ms 省 CPU；10 = 改动前的固定行为 */
 #endif
 
 #include <nuttx/input/touchscreen.h>
