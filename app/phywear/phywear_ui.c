@@ -1002,8 +1002,9 @@ lv_obj_t *pw_settings_screen(void)
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 118, PW_COL_CARD);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
 
+  pw_section_bar(card, PW_ACC_ACTIVE, 16, 14);
   lab = pw_label_new(card, PW_STR(UI_LANGUAGE), PW_FNT_MED, PW_COL_TEXT);
-  lv_obj_set_pos(lab, 16, 12);
+  lv_obj_set_pos(lab, 26, 12);
 
   lab = pw_label_new(card, PW_STR(LANGUAGE_HINT), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 16, 46);

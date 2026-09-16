@@ -565,8 +565,10 @@ static void inc_build_page_history(void)
   lv_obj_set_pos(pw_graph_obj(g_i.graph), 12, 24);
   pw_graph_controls_add(card, g_i.graph, inc_gctl_status, NULL);
 
+  /* 与频谱页同一处缺陷（2026-09-17 复查）：卡片高 268、控件条在图下方，
+   * 原来放 (12,248) 会压在控件上 —— 改为与 Y 轴标签同一行右对齐。 */
   lab = pw_label_new(card, PW_STR(AXIS_X_TIME), PW_FNT_BODY, PW_COL_FAINT);
-  lv_obj_set_pos(lab, 12, 248);
+  lv_obj_align(lab, LV_ALIGN_TOP_RIGHT, -12, 6);
 }
 
 static void inc_build_page_help(void)
