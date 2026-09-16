@@ -87,6 +87,7 @@ struct pw_graph_s;   /* 前向声明，避免强依赖 pw_graph.h */
 #define PW_ACC_ACTIVE   lv_color_hex(0xff9a3d)
 
 /* 图表网格/刻度线（暗底低干扰） */
+#define PW_COL_LIVE     lv_color_hex(0x22C55E)  /* 实时/正常状态点（colors.csv Accent） */
 #define PW_COL_LINE     lv_color_hex(0x475569)  /* 卡片 hairline 描边（colors.csv Border） */
 #define PW_COL_GRID     lv_color_hex(0x475569)  /* 网格/描边（colors.csv Border） */
 

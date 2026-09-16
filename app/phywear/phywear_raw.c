@@ -141,6 +141,8 @@ struct raw_page_s
   /* 迷你实时曲线（仅 3 轴页；光/麦克风/扬声器页不用） */
 
   lv_obj_t *scope;      /* pw_scope 图像对象（3 条泳道共用 1 个槽位） */
+  lv_obj_t *unitlab[3]; /* 数值右侧的单位列（大数字视图；曲线视图隐藏） */
+  lv_obj_t *numline[2]; /* 数值行之间的 1px hairline 分隔（大数字视图） */
   lv_obj_t *rangelab;   /* 左下：纵轴满量程（自动量程） */
   lv_obj_t *winlab;     /* 右下：横轴时间窗 */
   const char *unit;     /* 单位串（"g"/"dps"/"mG"，静态存储） */
@@ -650,6 +652,36 @@ static void raw_apply_view(void)
             }
         }
 
+      for (i = 0; i < 3; i++)
+        {
+          if (p->unitlab[i] != NULL)
+            {
+              if (curve)
+                {
+                  lv_obj_add_flag(p->unitlab[i], LV_OBJ_FLAG_HIDDEN);
+                }
+              else
+                {
+                  lv_obj_remove_flag(p->unitlab[i], LV_OBJ_FLAG_HIDDEN);
+                }
+            }
+        }
+
+      for (i = 0; i < 2; i++)
+        {
+          if (p->numline[i] != NULL)
+            {
+              if (curve)
+                {
+                  lv_obj_add_flag(p->numline[i], LV_OBJ_FLAG_HIDDEN);
+                }
+              else
+                {
+                  lv_obj_remove_flag(p->numline[i], LV_OBJ_FLAG_HIDDEN);
+                }
+            }
+        }
+
       if (p->rangelab != NULL)
         {
           if (curve)
@@ -900,6 +932,46 @@ static void raw_build_axis_page(int pi, int x, const char *name,
                                   LV_TEXT_ALIGN_CENTER, 0);
       lv_obj_set_pos(g_raw.pg[pi].val[i], colx, RAW_VAL_Y);
     }
+
+  /* 数字视图增强（v2）：数值右侧固定单位列 + 行间 1px hairline 分隔。
+   * 单位放在固定 x（310）而不是 align_to：数值宽度每帧都在变，align_to 会反复重排。
+   * 两者都只在"大数字"视图显示，切到曲线视图时隐藏（见 raw_apply_view）。 */
+
+  for (i = 0; i < 3; i++)
+    {
+      int rowy = RAW_ROW_Y0 + i * RAW_ROW_H;
+
+      g_raw.pg[pi].unitlab[i] = pw_label_new(pg, unit, PW_FNT_MED, PW_COL_DIM);
+      lv_obj_set_pos(g_raw.pg[pi].unitlab[i], 310, rowy + 24);
+
+      if (i > 0)
+        {
+          lv_obj_t *ln = lv_obj_create(pg);
+
+          lv_obj_set_size(ln, 358, 1);
+          lv_obj_set_pos(ln, 16, rowy - 16);
+          lv_obj_set_style_bg_color(ln, PW_COL_LINE, 0);
+          lv_obj_set_style_bg_opa(ln, LV_OPA_50, 0);
+          lv_obj_set_style_border_width(ln, 0, 0);
+          lv_obj_remove_flag(ln, LV_OBJ_FLAG_SCROLLABLE);
+          pw_deco(ln);
+          g_raw.pg[pi].numline[i - 1] = ln;
+        }
+    }
+
+  /* 顶部"实时"指示点：本页正在采样（raw 页 10~15 Hz 持续采集） */
+
+  {
+    lv_obj_t *dot = lv_obj_create(pg);
+
+    lv_obj_set_size(dot, 8, 8);
+    lv_obj_set_pos(dot, 352, 14);
+    lv_obj_set_style_bg_color(dot, PW_COL_LIVE, 0);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(dot, 0, 0);
+    lv_obj_remove_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+    pw_deco(dot);
+  }
 
   /* 迷你实时曲线：一块 358×186 的 pw_scope 缓冲竖直切成 3 条泳道 */
 
@@ -1238,7 +1310,7 @@ static void raw_show_vals(int pi, FAR const float *v)
         {
           lv_label_set_text_fmt(g_raw.pg[pi].val[i],
                                 (g_raw_view == RAW_VIEW_CURVE)
-                                    ? FMT_G : "%+.2f g", v[i]);
+                                    ? FMT_G : "%+.2f", v[i]);
         }
       else if (pi == 1)
         {
@@ -1254,14 +1326,14 @@ static void raw_show_vals(int pi, FAR const float *v)
           else
             {
               lv_label_set_text_fmt(g_raw.pg[pi].val[i],
-                                    big ? "%+.0f dps" : "%+.1f dps", v[i]);
+                                    big ? "%+.0f" : "%+.1f", v[i]);
             }
         }
       else
         {
           lv_label_set_text_fmt(g_raw.pg[pi].val[i],
                                 (g_raw_view == RAW_VIEW_CURVE)
-                                    ? FMT_MG : "%+d mG", (int)v[i]);
+                                    ? FMT_MG : "%+d", (int)v[i]);
         }
     }
 }
