@@ -60,6 +60,10 @@ B64_INDEX = {c: i for i, c in enumerate(B64_ALPHABET)}
 CHUNK = 192
 PASSES = 2
 
+# 容忍模式：允许每帧最多 N 行缺失（用邻近行填充）。仅用于"重绘中页面"的评审截图，
+# 不作为像素级证据（行内容非真实）。用法：PWSHOT_TOLERANCE=60 pwshot.py run ...
+TOLERANCE = int(os.environ.get("PWSHOT_TOLERANCE", "0"))
+
 
 def expected_b64_len(seq, total, chunk=CHUNK):
     """Base64 length the board emits for chunk `seq` of a `total` byte frame."""
@@ -224,6 +228,15 @@ class FrameCollector:
 
         chunks = (meta["bytes"] + CHUNK - 1) // CHUNK
         missing = [seq for seq in range(chunks) if seq not in best]
+        if missing and TOLERANCE and len(missing) <= TOLERANCE:
+            log(f"~~ {meta['name']}: 容忍模式 —— {len(missing)}/{chunks} 行缺失，"
+                f"用邻近行填充（仅供评审，非像素级证据）")
+            for seq in missing:
+                near = next((k for k in range(seq, chunks) if k in best), None) or \
+                       next((k for k in range(seq, -1, -1) if k in best), None)
+                if near is not None:
+                    best[seq] = best[near]
+            missing = []
         if missing:
             log(f"!! {meta['name']}: {len(missing)}/{chunks} line(s) missing "
                 f"after {PASSES} passes (e.g. {missing[:6]}); "
