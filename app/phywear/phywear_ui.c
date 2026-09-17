@@ -43,8 +43,6 @@
 #include "phywear_i18n.h"
 #include "pw_graph.h"
 #include "pw_motion_lvgl.h"
-#include "pw_theme.h"
-#include "pw_glow.h"
 #include "phywear_raw.h"
 #include "phywear_pend.h"
 #include "phywear_spec.h"
@@ -64,11 +62,11 @@
 
 /* 主菜单宫格几何 */
 
-#define MENU_TILE_W    86    /* v8 定稿：4 列方形格 */
-#define MENU_TILE_H    92
+#define MENU_TILE_W    183
+#define MENU_TILE_H    88
 #define MENU_GAP       8
 #define MENU_X0        8
-#define MENU_Y0        132   /* 让出顶部聚焦卡 */
+#define MENU_Y0        70
 
 /****************************************************************************
  * Private Data
@@ -206,68 +204,6 @@ static void ui_back_cb(lv_event_t *e)
  * 只动 y 一个属性；user_data 传 tile 的基准 y（与 CLICKED 的 user_data 各用一套）。 */
 
 
-static lv_obj_t *g_dots[8];        /* 分页圆点（v8 定稿：8 点反映聚焦位置） */
-static lv_obj_t *g_glow_a;
-static lv_obj_t *g_glow_b;
-static lv_obj_t *g_focus_name;
-static lv_obj_t *g_focus_info;
-static const char *g_bname[8];
-static const char *g_binfo[8];
-
-static void ui_tile_focus_cb(lv_event_t *e)
-{
-  int idx = (int)(intptr_t)lv_event_get_user_data(e);
-
-  if (g_focus_name == NULL || g_focus_info == NULL || idx < 0 || idx >= 8)
-    {
-      return;
-    }
-
-  if (g_bname[idx] != NULL)
-    {
-      lv_label_set_text(g_focus_name, g_bname[idx]);
-    }
-
-  if (g_binfo[idx] != NULL)
-    {
-      lv_label_set_text(g_focus_info, g_binfo[idx]);
-    }
-
-  /* 光斑随聚焦模块漂移（只改位置，无每帧开销） */
-
-  if (g_glow_a != NULL)
-    {
-      int col = idx % 4;
-
-      lv_obj_set_pos(g_glow_a, -140 + col * 70, -70);
-    }
-
-  if (g_glow_b != NULL)
-    {
-      int col = idx % 4;
-
-      lv_obj_set_pos(g_glow_b, 240 - col * 80, 250);
-    }
-
-  /* 圆点分页：聚焦项用主题色 + 稍大（其余用卡片高亮色） */
-
-  {
-    int i;
-
-    for (i = 0; i < 8; i++)
-      {
-        if (g_dots[i] != NULL)
-          {
-            lv_obj_set_style_bg_color(g_dots[i],
-                                      (i == idx) ? pw_theme_accent()
-                                                 : PW_COL_CARD_LT, 0);
-            lv_obj_set_size(g_dots[i], (i == idx) ? 10 : 6,
-                            (i == idx) ? 10 : 6);
-          }
-      }
-  }
-}
-
 static void ui_tile_cb(lv_event_t *e)
 {
   lv_obj_t *(*open)(void) = lv_event_get_user_data(e);
@@ -314,48 +250,6 @@ lv_obj_t *pw_scr_new(void)
   lv_obj_set_style_border_width(scr, 0, 0);
   lv_obj_set_style_radius(scr, 0, 0);
   lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-
-  /* v8 定稿 §7：底晕 —— 上下各一层 **2 段竖直线性渐变**（EPIC 唯一支持的渐变形态：
-   * 2 段 + 竖直 + radius 0），强度用"强调色与**蓝底**按比例混合"预计算成实色，
-   * 因为 LVGL 渐变没有透明度停靠点。创建在最前 → 天然在所有内容之下。 */
-
-  {
-    lv_obj_t *w1 = lv_obj_create(scr);
-    lv_obj_t *w2 = lv_obj_create(scr);
-
-    lv_obj_set_size(w1, PW_SCREEN_W, PW_SCREEN_H);
-    lv_obj_set_pos(w1, 0, 0);
-    lv_obj_set_size(w2, PW_SCREEN_W, PW_SCREEN_H);
-    lv_obj_set_pos(w2, 0, 0);
-
-    /* 顶部：强调色 16% → 黑 */
-
-    lv_obj_set_style_bg_color(w1, lv_color_mix(pw_theme_accent(), PW_COL_BG,
-                                               PW_WASH_TOP * 255 / 100), 0);
-    lv_obj_set_style_bg_grad_color(w1, PW_COL_BG, 0);
-    lv_obj_set_style_bg_grad_dir(w1, LV_GRAD_DIR_VER, 0);
-
-    /* 底部：黑 → 强调色 10%（方向反过来） */
-
-    lv_obj_set_style_bg_color(w2, PW_COL_BG, 0);
-    lv_obj_set_style_bg_grad_color(w2, lv_color_mix(pw_theme_accent(),
-                                                     PW_COL_BG,
-                                                     PW_WASH_BOTTOM * 255 / 100), 0);
-    lv_obj_set_style_bg_grad_dir(w2, LV_GRAD_DIR_VER, 0);
-
-    lv_obj_set_style_bg_opa(w1, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_opa(w2, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(w1, 0, 0);
-    lv_obj_set_style_radius(w2, 0, 0);
-    lv_obj_set_style_border_width(w1, 0, 0);
-    lv_obj_set_style_border_width(w2, 0, 0);
-    lv_obj_set_style_pad_all(w1, 0, 0);
-    lv_obj_set_style_pad_all(w2, 0, 0);
-    lv_obj_remove_flag(w1, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(w2, LV_OBJ_FLAG_SCROLLABLE);
-    pw_deco(w1);
-    pw_deco(w2);
-  }
 
   return scr;
 }
@@ -442,79 +336,6 @@ void pw_scr_set_tick(lv_obj_t *scr, lv_timer_cb_t cb, uint32_t period_ms)
   lv_obj_add_event_cb(scr, ui_del_cb, LV_EVENT_DELETE, t);
 }
 
-/* v8 定稿 §6：指令面板（离线兜底）。真语音（Agent 链路）在 S7 接入；
- * 这里先保证"按一下就能切主题"，面板本身用主题强调色做选中反馈。 */
-
-static lv_obj_t *g_voice_panel;
-
-static const char *const g_theme_name[PW_THEME_COUNT] =
-{
-  "玫瑰", "青", "琥珀", "单色"
-};
-
-static void pw_voice_close(void)
-{
-  if (g_voice_panel != NULL)
-    {
-      lv_obj_delete(g_voice_panel);
-      g_voice_panel = NULL;
-    }
-}
-
-static void pw_voice_chip_cb(lv_event_t *e)
-{
-  int idx = (int)(intptr_t)lv_event_get_user_data(e);
-
-  if (idx >= 0 && idx < PW_THEME_COUNT)
-    {
-      pw_theme_set(idx);
-      printf("[ui] theme -> %s (%d)\n", g_theme_name[idx], idx);
-    }
-
-  pw_voice_close();
-}
-
-static void pw_voice_cb(lv_event_t *e)
-{
-  lv_obj_t *scr = lv_obj_get_screen(lv_event_get_target(e));
-  lv_obj_t *p;
-  lv_obj_t *lab;
-  lv_obj_t *btn;
-  int i;
-
-  if (g_voice_panel != NULL)
-    {
-      pw_voice_close();      /* 再按一下收起 */
-      return;
-    }
-
-  p = pw_card_new(scr, PW_SCREEN_W - 2 * MENU_X0, 150, PW_COL_CARD);
-  lv_obj_align(p, LV_ALIGN_BOTTOM_MID, 0, -14);
-  lv_obj_set_style_border_width(p, 1, 0);
-  lv_obj_set_style_border_color(p, PW_COL_LINE, 0);
-  g_voice_panel = p;
-
-  lab = pw_label_new(p, "语音 / 指令（离线兜底）", PW_FNT_BODY, PW_COL_DIM);
-  lv_obj_set_pos(lab, 12, 8);
-
-  for (i = 0; i < PW_THEME_COUNT; i++)
-    {
-      lv_color_t c = (i == pw_theme_get()) ? pw_theme_accent() : PW_COL_CARD_LT;
-
-      btn = pw_card_new(p, 78, 42, c);
-      lv_obj_set_pos(btn, 12 + (i % 4) * 84, 40);
-      lv_obj_add_event_cb(btn, pw_voice_chip_cb, LV_EVENT_CLICKED,
-                          (void *)(intptr_t)i);
-      pw_press_style(btn);
-      lab = pw_label_new(btn, g_theme_name[i], PW_FNT_BODY, PW_COL_TEXT);
-      lv_obj_center(lab);
-    }
-
-  lab = pw_label_new(p, "主题立即生效；上板后这里接 Agent 语音",
-                     PW_FNT_BODY, PW_COL_FAINT);
-  lv_obj_set_pos(lab, 12, 104);
-}
-
 lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
 {
   lv_obj_t *bar;
@@ -555,31 +376,8 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   /* 顶栏右侧运行计时（phyphox 工具栏语义；进入测量屏后 1Hz 刷新 mm:ss） */
 
   lab = pw_label_new(bar, "", PW_FNT_SMALL, PW_COL_DIM);
-  /* v8 定稿 §4：顶栏右侧固定槽位 = 麦克风（-20），时间/版本让到 -66 */
-
-  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -66, 0);
+  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
   g_pending_timer = lab;
-
-  /* 全局语音 / 指令入口：每页顶栏同一个按钮。
-   * 离线兜底 = 指令面板（主题切换 + 回主页）；真语音在 S7 接 Agent。 */
-
-  {
-    lv_obj_t *mic = lv_obj_create(bar);
-
-    lv_obj_set_size(mic, 38, 38);
-    lv_obj_align(mic, LV_ALIGN_RIGHT_MID, -20, 0);
-    lv_obj_set_style_radius(mic, 19, 0);
-    lv_obj_set_style_bg_color(mic, PW_COL_CARD, 0);
-    lv_obj_set_style_border_width(mic, 1, 0);
-    lv_obj_set_style_border_color(mic, PW_COL_LINE, 0);
-    lv_obj_set_style_pad_all(mic, 0, 0);
-    lv_obj_remove_flag(mic, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(mic, pw_voice_cb, LV_EVENT_CLICKED, NULL);
-    pw_press_style(mic);
-
-    lab = pw_label_new(mic, "语", PW_FNT_BODY, pw_theme_accent());
-    lv_obj_center(lab);
-  }
 
   /* 内容区（下方全部区域，调用方可改尺寸） */
 
@@ -838,14 +636,6 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
 
       row = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 64,
                         PW_COL_CARD);
-      /* S4：细线分组（不再用"卡片行"）—— 透明底 + 仅底线 */
-
-      lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-      lv_obj_set_style_radius(row, 0, 0);
-      lv_obj_set_style_border_width(row, 1, 0);
-      lv_obj_set_style_border_side(row, LV_BORDER_SIDE_BOTTOM, 0);
-      lv_obj_set_style_border_color(row, PW_COL_LINE, 0);
-      lv_obj_set_style_border_opa(row, LV_OPA_50, 0);
       lv_obj_set_pos(row, MENU_X0, y);
 #if PW_UI_MOTION
       /* 错峰入场：**必须传显式 base y**（见 pw_motion_slide_in_y_at 注释） */
@@ -857,29 +647,20 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
         {
           /* 左侧强调条 */
 
-          strip = lv_obj_create(row);          /* 复用变量名：现在是"图标块" */
-          lv_obj_set_size(strip, 32, 32);
-          lv_obj_set_pos(strip, 12, 16);
-          lv_obj_set_style_bg_color(strip, PW_COL_CARD_LT, 0);
-          lv_obj_set_style_radius(strip, 8, 0);
-          lv_obj_set_style_border_width(strip, 0, 0);
+          strip = lv_obj_create(row);
+          lv_obj_set_size(strip, 3, 36);
+          lv_obj_set_pos(strip, 10, 14);
           pw_deco(strip);
-          {
-            char nb[4];
-
-            snprintf(nb, sizeof(nb), "%02d", i + 1);
-            lab = pw_label_new(strip, nb, PW_FNT_BODY, pw_theme_accent());
-            lv_obj_center(lab);
-          }
+          lv_obj_set_style_bg_color(strip, accent, 0);
           lv_obj_set_style_radius(strip, 2, 0);
           lv_obj_set_style_border_width(strip, 0, 0);
           lv_obj_remove_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 54, 9);
+          lv_obj_set_pos(lab, 26, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 54, 34);
+          lv_obj_set_pos(lab, 26, 34);
 
           lab = pw_label_new(row, ">", PW_FNT_MED, PW_COL_DIM);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
@@ -892,10 +673,10 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
           /* 未实现项：置灰 + 角标 */
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 54, 9);
+          lv_obj_set_pos(lab, 22, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 54, 34);
+          lv_obj_set_pos(lab, 22, 34);
 
           lab = pw_label_new(row, PW_STR(UI_PLANNED), PW_FNT_BODY, PW_COL_FAINT);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -14, 0);
@@ -1220,30 +1001,10 @@ lv_obj_t *pw_settings_screen(void)
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 118, PW_COL_CARD);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
-  /* S5-④：设置列表页 —— 细线分组 + 32px 图标块（v8 定稿页型④） */
-
-  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_radius(card, 0, 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_BOTTOM, 0);
-  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
-  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
-  {
-    lv_obj_t *ic = lv_obj_create(card);
-
-    lv_obj_set_size(ic, 32, 32);
-    lv_obj_set_pos(ic, 12, 16);
-    lv_obj_set_style_bg_color(ic, PW_COL_CARD_LT, 0);
-    lv_obj_set_style_radius(ic, 8, 0);
-    lv_obj_set_style_border_width(ic, 0, 0);
-    pw_deco(ic);
-    lab = pw_label_new(ic, "文", PW_FNT_BODY, pw_theme_accent());
-    lv_obj_center(lab);
-  }
 
   pw_section_bar(card, PW_ACC_ACTIVE, 16, 14);
   lab = pw_label_new(card, PW_STR(UI_LANGUAGE), PW_FNT_MED, PW_COL_TEXT);
-  lv_obj_set_pos(lab, 54, 12);
+  lv_obj_set_pos(lab, 26, 12);
 
   lab = pw_label_new(card, PW_STR(LANGUAGE_HINT), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 16, 46);
@@ -1251,7 +1012,6 @@ lv_obj_t *pw_settings_screen(void)
   /* 英文按钮 */
   btn = pw_card_new(card, 120, 40, zh ? PW_COL_CARD_LT : PW_COL_CARD);
   lv_obj_set_pos(btn, 16, 70);
-  lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_bg_color(btn, zh ? PW_COL_CARD : PW_COL_CARD_LT,
                             LV_STATE_PRESSED);
   lab = pw_label_new(btn, PW_STR(LANG_EN), PW_FNT_MED,
@@ -1262,7 +1022,6 @@ lv_obj_t *pw_settings_screen(void)
   /* 中文按钮 */
   btn = pw_card_new(card, 120, 40, zh ? PW_COL_CARD_LT : PW_COL_CARD);
   lv_obj_set_pos(btn, 168, 70);
-  lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_bg_color(btn, zh ? PW_COL_CARD_LT : PW_COL_CARD,
                             LV_STATE_PRESSED);
   lab = pw_label_new(btn, PW_STR(LANG_ZH), PW_FNT_MED,
@@ -1273,27 +1032,7 @@ lv_obj_t *pw_settings_screen(void)
   /* --- 关于 --- */
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 64, PW_COL_CARD);
-
-  /* S5-④：设置列表页 —— 细线分组 + 32px 图标块（v8 定稿页型④） */
-
-  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_radius(card, 0, 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_BOTTOM, 0);
-  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
-  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
-  {
-    lv_obj_t *ic = lv_obj_create(card);
-
-    lv_obj_set_size(ic, 32, 32);
-    lv_obj_set_pos(ic, 12, 16);
-    lv_obj_set_style_bg_color(ic, PW_COL_CARD_LT, 0);
-    lv_obj_set_style_radius(ic, 8, 0);
-    lv_obj_set_style_border_width(ic, 0, 0);
-    pw_deco(ic);
-    lab = pw_label_new(ic, "?", PW_FNT_BODY, pw_theme_accent());
-    lv_obj_center(lab);
-  }  lv_obj_set_pos(card, MENU_X0, MENU_GAP + 130);
+  lv_obj_set_pos(card, MENU_X0, MENU_GAP + 130);
 
   lab = pw_label_new(card, PW_STR(UI_ABOUT), PW_FNT_MED, PW_COL_TEXT);
   lv_obj_set_pos(lab, 16, 20);
@@ -1316,14 +1055,6 @@ lv_obj_t *pw_about_screen(void)
   cont = pw_topbar(scr, PW_STR(UI_ABOUT));
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 330, PW_COL_CARD);
-  /* S6：关于页按"页型④"改造 —— 去掉大圆角卡片，改细线分组（taste-skill §4.4） */
-
-  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_radius(card, 0, 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_TOP, 0);
-  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
-  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
 
   lab = pw_label_new(card, "PhyWear v0.1", PW_FNT_LARGE, PW_ACC_ACTIVE);
@@ -1392,28 +1123,6 @@ void pw_ui_root(void)
 
   scr = pw_scr_new();
 
-  /* 光斑（v8 定稿 §7）：96×96 A8 遮罩 + recolor 主题色。
-   * 紧跟底晕之后创建 → 天然位于"底晕之上、所有内容之下"（不要用 move_background，
-   * 那会把它压到不透明底晕下面，实测看不见）。 */
-
-  g_glow_a = lv_image_create(scr);
-  lv_image_set_src(g_glow_a, &pw_glow_dsc);
-  lv_obj_set_style_image_recolor(g_glow_a, pw_theme_accent(), 0);
-  lv_obj_set_style_image_recolor_opa(g_glow_a, LV_OPA_COVER, 0);
-  lv_obj_set_style_image_opa(g_glow_a, LV_OPA_50, 0);
-  lv_image_set_scale(g_glow_a, 256 * 4);
-  lv_obj_set_pos(g_glow_a, -120, -70);
-  pw_deco(g_glow_a);
-
-  g_glow_b = lv_image_create(scr);
-  lv_image_set_src(g_glow_b, &pw_glow_dsc);
-  lv_obj_set_style_image_recolor(g_glow_b, pw_theme_accent(), 0);
-  lv_obj_set_style_image_recolor_opa(g_glow_b, LV_OPA_COVER, 0);
-  lv_obj_set_style_image_opa(g_glow_b, LV_OPA_30, 0);
-  lv_image_set_scale(g_glow_b, 256 * 3);
-  lv_obj_set_pos(g_glow_b, 220, 250);
-  pw_deco(g_glow_b);
-
   /* 标题行（左边缘圆弧屏切角：文本需右移进安全区） */
 
   lab = pw_label_new(scr, PW_STR(UI_PHYWEAR), PW_FNT_XL, PW_COL_TEXT);
@@ -1438,40 +1147,12 @@ void pw_ui_root(void)
   lab = pw_label_new(btn, "...", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
 
-  /* 聚焦卡（v8 定稿 §4）：按住某格即更新 */
-
-  {
-    lv_obj_t *fc = pw_card_new(scr, PW_SCREEN_W - 2 * MENU_X0, 58, PW_COL_CARD);
-    lv_obj_t *fb;
-
-    lv_obj_set_pos(fc, MENU_X0, 62);
-    lv_obj_set_style_border_width(fc, 1, 0);
-    lv_obj_set_style_border_color(fc, pw_theme_accent(), 0);
-    lv_obj_set_style_border_opa(fc, LV_OPA_50, 0);
-
-    fb = lv_obj_create(fc);
-    lv_obj_set_size(fb, 3, 16);
-    lv_obj_set_pos(fb, 10, 12);
-    lv_obj_set_style_bg_color(fb, pw_theme_accent(), 0);
-    lv_obj_set_style_radius(fb, 2, 0);
-    lv_obj_set_style_border_width(fb, 0, 0);
-    lv_obj_remove_flag(fb, LV_OBJ_FLAG_SCROLLABLE);
-    pw_deco(fb);
-
-    g_focus_name = pw_label_new(fc, boards[0].name, PW_FNT_MED, PW_COL_TEXT);
-    lv_obj_set_pos(g_focus_name, 22, 8);
-
-    g_focus_info = pw_label_new(fc, boards[0].info, PW_FNT_BODY, PW_COL_DIM);
-    lv_obj_set_pos(g_focus_info, 22, 34);
-  }
-
-
-  /* 板块宫格 4×2 */
+  /* 板块宫格 2×4 */
 
   for (i = 0; i < nboards; i++)
     {
-      int col = i % 4;              /* v8 定稿：4 列 × 2 行 */
-      int row = i / 4;
+      int col = i % 2;
+      int row = i / 2;
       int x = MENU_X0 + col * (MENU_TILE_W + MENU_GAP);
       int y = MENU_Y0 + row * (MENU_TILE_H + MENU_GAP);
       const struct pw_board_s *b = &boards[i];
@@ -1485,8 +1166,6 @@ void pw_ui_root(void)
       lv_obj_set_style_bg_color(tile, PW_COL_CARD_LT, LV_STATE_PRESSED);
       lv_obj_add_event_cb(tile, ui_tile_cb, LV_EVENT_CLICKED,
                           (void *)b->open);
-      g_bname[i] = b->name;
-      g_binfo[i] = b->info;
 #if PW_UI_MOTION
       /* 按压反馈走 pw_card_new() 里的统一按压样式（位移+底色，120ms C4）；
        * 这里只做**入场错峰**：8 块依次从 +12px 落位。EVENT_BUBBLE 让点在
@@ -1494,17 +1173,15 @@ void pw_ui_root(void)
 
       lv_obj_add_flag(tile, LV_OBJ_FLAG_EVENT_BUBBLE);
       pw_motion_slide_in_y_at(tile, y, 12, 240, (uint32_t)i * 40);
-      lv_obj_add_event_cb(tile, ui_tile_focus_cb, LV_EVENT_PRESSED,
-                          (void *)(intptr_t)i);
 #endif
 
       /* 板块图标：淡色圆底 + LV_SYMBOL 字形（内置 Montserrat 已含 symbols，
        * 不必重生成中文字体子集；字色用板块色，视觉上仍是"一区一色"） */
 
       chip = lv_obj_create(tile);
-      lv_obj_set_size(chip, 32, 32);
-      lv_obj_set_pos(chip, (MENU_TILE_W - 32) / 2, 14);
-      lv_obj_set_style_bg_color(chip, pw_theme_accent(), 0);
+      lv_obj_set_size(chip, 30, 30);
+      lv_obj_set_pos(chip, 12, 12);
+      lv_obj_set_style_bg_color(chip, lv_color_hex(b->color), 0);
       lv_obj_set_style_bg_opa(chip, LV_OPA_20, 0);
       lv_obj_set_style_radius(chip, 9, 0);   /* 圆角方块（v2 观感） */
       lv_obj_set_style_border_width(chip, 0, 0);
@@ -1514,12 +1191,12 @@ void pw_ui_root(void)
       if (b->draw != 0)
         {
           tile_draw_icon(chip, b->draw,
-                         b->live ? pw_theme_accent() : PW_COL_FAINT);
+                         b->live ? lv_color_hex(b->color) : PW_COL_FAINT);
         }
       else
         {
           lab = pw_label_new(chip, b->icon, &lv_font_montserrat_20,
-                             b->live ? pw_theme_accent() : PW_COL_FAINT);
+                             b->live ? lv_color_hex(b->color) : PW_COL_FAINT);
           lv_obj_center(lab);
         }
 
@@ -1527,40 +1204,13 @@ void pw_ui_root(void)
 
       name = pw_label_new(tile, b->name, PW_FNT_MED,
                           b->live ? PW_COL_TEXT : PW_COL_FAINT);
-      lv_obj_set_width(name, MENU_TILE_W - 8);
-      lv_label_set_long_mode(name, LV_LABEL_LONG_WRAP);
-      lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
-      lv_obj_set_pos(name, 4, 52);
+      lv_obj_set_pos(name, 52, 12);
 
       info = pw_label_new(tile, b->info, PW_FNT_BODY,
                           b->live ? PW_COL_DIM : PW_COL_FAINT);
-      lv_obj_add_flag(info, LV_OBJ_FLAG_HIDDEN);   /* 方形格放不下，交给聚焦卡 */
+      lv_obj_set_pos(info, 50, 52);
     }
 
-  /* 分页圆点：8 点居中排在宫格下方（聚焦项高亮，见 ui_tile_focus_cb） */
-
-  {
-    int i;
-
-    for (i = 0; i < 8; i++)
-      {
-        lv_obj_t *d = lv_obj_create(scr);
-
-        lv_obj_set_size(d, 6, 6);
-        lv_obj_set_pos(d, 199 - 8 * 5 + i * 16, 408);
-        lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(d, PW_COL_CARD_LT, 0);
-        lv_obj_set_style_border_width(d, 0, 0);
-        lv_obj_remove_flag(d, LV_OBJ_FLAG_SCROLLABLE);
-        pw_deco(d);
-        g_dots[i] = d;
-      }
-
-    lv_obj_set_style_bg_color(g_dots[0], pw_theme_accent(), 0);
-    lv_obj_set_size(g_dots[0], 10, 10);
-  }
-
-  pw_scr_open(scr);
   pw_scr_open(scr);
 }
 
