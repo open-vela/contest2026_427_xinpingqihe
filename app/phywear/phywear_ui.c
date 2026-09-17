@@ -838,6 +838,14 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
 
       row = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 64,
                         PW_COL_CARD);
+      /* S4：细线分组（不再用"卡片行"）—— 透明底 + 仅底线 */
+
+      lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+      lv_obj_set_style_radius(row, 0, 0);
+      lv_obj_set_style_border_width(row, 1, 0);
+      lv_obj_set_style_border_side(row, LV_BORDER_SIDE_BOTTOM, 0);
+      lv_obj_set_style_border_color(row, PW_COL_LINE, 0);
+      lv_obj_set_style_border_opa(row, LV_OPA_50, 0);
       lv_obj_set_pos(row, MENU_X0, y);
 #if PW_UI_MOTION
       /* 错峰入场：**必须传显式 base y**（见 pw_motion_slide_in_y_at 注释） */
@@ -849,20 +857,29 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
         {
           /* 左侧强调条 */
 
-          strip = lv_obj_create(row);
-          lv_obj_set_size(strip, 3, 36);
-          lv_obj_set_pos(strip, 10, 14);
+          strip = lv_obj_create(row);          /* 复用变量名：现在是"图标块" */
+          lv_obj_set_size(strip, 32, 32);
+          lv_obj_set_pos(strip, 12, 16);
+          lv_obj_set_style_bg_color(strip, PW_COL_CARD_LT, 0);
+          lv_obj_set_style_radius(strip, 8, 0);
+          lv_obj_set_style_border_width(strip, 0, 0);
           pw_deco(strip);
-          lv_obj_set_style_bg_color(strip, pw_theme_accent(), 0);   /* 全局单一强调色 */
+          {
+            char nb[4];
+
+            snprintf(nb, sizeof(nb), "%02d", i + 1);
+            lab = pw_label_new(strip, nb, PW_FNT_BODY, pw_theme_accent());
+            lv_obj_center(lab);
+          }
           lv_obj_set_style_radius(strip, 2, 0);
           lv_obj_set_style_border_width(strip, 0, 0);
           lv_obj_remove_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 26, 9);
+          lv_obj_set_pos(lab, 54, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 26, 34);
+          lv_obj_set_pos(lab, 54, 34);
 
           lab = pw_label_new(row, ">", PW_FNT_MED, PW_COL_DIM);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
@@ -875,10 +892,10 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
           /* 未实现项：置灰 + 角标 */
 
           lab = pw_label_new(row, it->name, PW_FNT_MED, namecol);
-          lv_obj_set_pos(lab, 22, 9);
+          lv_obj_set_pos(lab, 54, 9);
 
           lab = pw_label_new(row, it->desc, PW_FNT_BODY, desccol);
-          lv_obj_set_pos(lab, 22, 34);
+          lv_obj_set_pos(lab, 54, 34);
 
           lab = pw_label_new(row, PW_STR(UI_PLANNED), PW_FNT_BODY, PW_COL_FAINT);
           lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -14, 0);
