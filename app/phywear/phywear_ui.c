@@ -206,6 +206,7 @@ static void ui_back_cb(lv_event_t *e)
  * 只动 y 一个属性；user_data 传 tile 的基准 y（与 CLICKED 的 user_data 各用一套）。 */
 
 
+static lv_obj_t *g_dots[8];        /* 分页圆点（v8 定稿：8 点反映聚焦位置） */
 static lv_obj_t *g_glow_a;
 static lv_obj_t *g_glow_b;
 static lv_obj_t *g_focus_name;
@@ -247,6 +248,24 @@ static void ui_tile_focus_cb(lv_event_t *e)
 
       lv_obj_set_pos(g_glow_b, 240 - col * 80, 250);
     }
+
+  /* 圆点分页：聚焦项用主题色 + 稍大（其余用卡片高亮色） */
+
+  {
+    int i;
+
+    for (i = 0; i < 8; i++)
+      {
+        if (g_dots[i] != NULL)
+          {
+            lv_obj_set_style_bg_color(g_dots[i],
+                                      (i == idx) ? pw_theme_accent()
+                                                 : PW_COL_CARD_LT, 0);
+            lv_obj_set_size(g_dots[i], (i == idx) ? 10 : 6,
+                            (i == idx) ? 10 : 6);
+          }
+      }
+  }
 }
 
 static void ui_tile_cb(lv_event_t *e)
@@ -1451,6 +1470,30 @@ void pw_ui_root(void)
       lv_obj_add_flag(info, LV_OBJ_FLAG_HIDDEN);   /* 方形格放不下，交给聚焦卡 */
     }
 
+  /* 分页圆点：8 点居中排在宫格下方（聚焦项高亮，见 ui_tile_focus_cb） */
+
+  {
+    int i;
+
+    for (i = 0; i < 8; i++)
+      {
+        lv_obj_t *d = lv_obj_create(scr);
+
+        lv_obj_set_size(d, 6, 6);
+        lv_obj_set_pos(d, 199 - 8 * 5 + i * 16, 408);
+        lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(d, PW_COL_CARD_LT, 0);
+        lv_obj_set_style_border_width(d, 0, 0);
+        lv_obj_remove_flag(d, LV_OBJ_FLAG_SCROLLABLE);
+        pw_deco(d);
+        g_dots[i] = d;
+      }
+
+    lv_obj_set_style_bg_color(g_dots[0], pw_theme_accent(), 0);
+    lv_obj_set_size(g_dots[0], 10, 10);
+  }
+
+  pw_scr_open(scr);
   pw_scr_open(scr);
 }
 
