@@ -52,6 +52,16 @@
   .wash{position:absolute;inset:0;background:var(--accent);opacity:0;pointer-events:none;z-index:40;
         transition:opacity .45s ease-out}
 
+  /* 光流体：两团跟随"当前模块位置"漂移的强调色环境光（v3 的效果搬回来）
+     规矩：只用当前主题的单一强调色 · 透明度 ≤ .18 · 只动 transform/opacity · 由交互/数据驱动（不循环） */
+  .glow{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+  .glow i{position:absolute;left:0;top:0;width:360px;height:300px;border-radius:50%;
+          background:radial-gradient(circle at 50% 50%, var(--accent), transparent 68%);
+          will-change:transform,opacity;
+          transition:transform .6s cubic-bezier(.22,1,.36,1),opacity .6s,background .6s}
+  .glow i.a{opacity:.17}
+  .glow i.b{opacity:.10}
+
   .bar{height:56px;display:flex;align-items:center;padding:0 20px 0 14px;   /* 右侧 20px：时间/⋯/版本号左移一点点 */position:relative;z-index:6;
        border-bottom:1px solid var(--line);transition:border-color .6s}
   .bar .id{font-size:19px;font-weight:700}
@@ -177,6 +187,7 @@
   </div>
 
   <div class="watch" id="watch">
+    <div class="glow" id="glow"><i class="a" id="gA"></i><i class="b" id="gB"></i></div>
     <div class="wash" id="wash"></div>
 
     <!-- 主页（宫格 / 卡片流 两套共存） -->
@@ -345,6 +356,7 @@ function applyTheme(t,announce){
   if(w&&D){ w.style.transition='none'; w.style.opacity='.14';
     requestAnimationFrame(()=>{ w.style.transition='opacity .45s ease-out'; w.style.opacity='0'; }); }
   buildThemeList();
+  if(typeof updateGlow==='function') updateGlow(LAYOUT==='grid'?(focus+0.5)/8:Math.min(1,Math.max(0,fOffset/(252*7))));
   if(announce) toast('已切换为 '+THEMES.find(x=>x[0]===t)[1]+' 主题');
 }
 let toastT=null;
@@ -373,8 +385,17 @@ BOARDS.forEach((b,i)=>{
     setTimeout(()=>{ el.style.transition='transform .3s cubic-bezier(.22,1,.36,1),opacity .3s';
       el.style.opacity='1'; el.style.transform='translateY(0) scale(1)'; }, 40+i*32); }
 });
+function updateGlow(t){            /* t: 0..1 表示"当前模块在 8 个里的位置" */
+  const A=$('#gA'), B=$('#gB'); if(!A||!B) return;
+  const ax = -140 + t*430,  ay = -90 + Math.sin(t*Math.PI)*70;
+  const bx =  240 - t*380,  by =  210 - Math.sin(t*Math.PI)*80;
+  A.style.transform=`translate(${ax}px,${ay}px)`;
+  B.style.transform=`translate(${bx}px,${by}px)`;
+  if(!D) return;                                  /* reduced-motion / 静态：只给位置，不做呼吸 */
+}
 function renderHome(){
   const body=BOARDS[focus];
+  updateGlow(LAYOUT==='grid' ? (focus+0.5)/8 : Math.min(1,Math.max(0,fOffset/(252*7))));
   $('#fName').textContent=body.s; $('#fDesc').textContent=body.d; $('#fVal').textContent='最近 '+body.val;
   ['#fName','#fVal'].forEach(s=>{const e=$(s); e.classList.remove('d1'); void e.offsetWidth; e.classList.add('d1');});
   if(LAYOUT==='grid'){
