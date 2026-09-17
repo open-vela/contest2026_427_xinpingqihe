@@ -75,6 +75,21 @@
        color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px}
   .mic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
   .rgroup{margin-left:auto;display:flex;align-items:center;gap:8px}
+  /* 全局语音：所有页顶栏同一个入口（不用进设置页） */
+  .gmic{position:absolute;right:52px;top:9px;width:38px;height:38px;border-radius:var(--r-pill);
+        border:1px solid var(--line);background:var(--card);color:var(--accent);
+        display:flex;align-items:center;justify-content:center;font-size:15px;z-index:8}
+  .gmic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .lpill{position:absolute;left:14px;bottom:-1px;transform:translateY(100%);display:none;align-items:center;gap:6px;
+         font-size:11.5px;color:var(--accent);z-index:9}
+  .lpill.on{display:flex}
+  .lpill .d{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:d1 1.2s ease-in-out infinite}
+  .vpanel{position:absolute;left:14px;right:14px;bottom:16px;background:var(--card2);border:1px solid var(--line2);
+          border-radius:16px;padding:12px 14px;z-index:60;display:none}
+  .vpanel.on{display:block}
+  .vpanel .h{font-size:13px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .vpanel .t{font-size:15px;margin-top:8px;line-height:1.4}
+  .vpanel .cmds{font-size:12px;color:var(--fg3);margin-top:10px;line-height:1.8}
   .set{width:38px;height:38px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--card);
        color:var(--fg2);display:flex;align-items:center;justify-content:center;font-size:17px;letter-spacing:1px}
   .set:active{background:var(--card2)}
@@ -261,6 +276,12 @@
       <div class="toast" id="toast"><span class="d"></span><span id="toastTx">已切换</span></div>
     </section>
 
+    <div class="vpanel" id="vpanel">
+      <div class="h"><span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--accent)"></span>
+        <span id="vState">聆听中…</span></div>
+      <div class="t" id="vText">—</div>
+      <div class="cmds">可说：切主题（玫瑰/青/琥珀/单色）· 打开单摆 · 打开倾角 · 回主页 · 打开设置</div>
+    </div>
     <div class="flip" id="flipLayer"></div>
   </div>
 
@@ -530,6 +551,8 @@ const SETROWS=[
   ['存','数据导出','CSV · 通过串口','可用 ›'],
   ['◷','采样率','原始传感器页刷新','10 Hz ›'],
   ['?','关于 PhyWear','版本 / 许可 / 归属','v0.1 ›'],
+  ['◎','始终聆听','全局语音免按键（离线时降级为指令芯片）','off'],
+
 ];
 function buildSetRows(){
   const el=$('#setRows'); if(!el) return;
@@ -538,8 +561,15 @@ function buildSetRows(){
     <span class="tx"><span class="nm">${r[1]}</span><span class="mt">${r[2]}</span></span>
     <span class="rt">${r[3]==='theme'?'进入 ›':r[3]}</span></div>`).join('');
   $$('#setRows .li').forEach(li=>li.addEventListener('click',()=>{
-    const g=li.dataset.go;
+    const g=li.dataset.go, rt=li.querySelector('.rt');
     if(g==='theme') { show('theme'); }
+    else if(g==='off' || g==='on'){                       /* 始终聆听开关 */
+      ALWAYS = !ALWAYS;
+      li.dataset.go = ALWAYS?'on':'off';
+      rt.textContent = ALWAYS?'开 ›':'off';
+      toast(ALWAYS?'始终聆听：已开启（说"手表…"开头）':'始终聆听：已关闭');
+      if(ALWAYS) startAlways(); else stopAlways();
+    }
     else if(g) toast('（演示）'+g);
   }));
 }
@@ -557,12 +587,43 @@ function buildThemeList(){
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null;
 function applyVoiceText(t){
-  const map=[[/青|蓝|cyan/i,'cyan'],[/玫瑰|粉|红|rose/i,'rose'],[/琥珀|橙|黄|amber/i,'amber'],[/单色|黑白|灰|极简|mono/i,'mono']];
-  for(const [re,k] of map){ if(re.test(t)){ toast('识别：「'+t+'」'); applyTheme(k,true); return; } }
-  toast('没听清：「'+t+'」（可说：切成青色 / 换成玫瑰 / 用单色）');
+  $('#vText').textContent='「'+t+'」';
+  const thememap=[[/青|蓝|cyan/i,'cyan'],[/玫瑰|粉|红|rose/i,'rose'],[/琥珀|橙|黄|amber/i,'amber'],[/单色|黑白|灰|极简|mono/i,'mono']];
+  for(const [re,k] of thememap){ if(re.test(t)){ applyTheme(k,true); setTimeout(hideVoice,900); return; } }
+  if(/回主页|主页|返回/.test(t)){ show('home'); toast('OK · 回主页'); setTimeout(hideVoice,800); return; }
+  if(/设置/.test(t)){ show('set'); toast('OK · 打开设置'); setTimeout(hideVoice,800); return; }
+  const hit=BOARDS.findIndex(b=>new RegExp(b.s+'|'+b.n).test(t)) ;
+  if(hit>=0){ focus=hit; renderHome(); openBoard(hit); toast('OK · 打开'+BOARDS[hit].n); setTimeout(hideVoice,800); return; }
+  toast('没听清：「'+t+'」');
+  setTimeout(hideVoice,1400);
 }
+function showVoice(){ $('#vpanel').classList.add('on'); $('#vState').textContent='聆听中…'; $('#vText').textContent='—'; }
+function hideVoice(){ $('#vpanel').classList.remove('on'); }
+/* 始终聆听：连续识别；只对含唤醒词"手表"或明确指令的句子动作 */
+let ALWAYS=false, recAlways=null;
+function startAlways(){
+  if(!SR){ toast('此浏览器不支持 → 用按键模式'); ALWAYS=false; return; }
+  const loop=()=>{
+    if(!ALWAYS) return;
+    recAlways=new SR(); recAlways.lang='zh-CN'; recAlways.continuous=true; recAlways.interimResults=false;
+    recAlways.onresult=ev=>{
+      const t=ev.results[ev.results.length-1][0].transcript;
+      if(/手表|PhyWear|phywear/i.test(t) || /切|换|打开|回主页|设置/.test(t)) applyVoiceText(t.replace(/手表|PhyWear|phywear/gi,''));
+    };
+    recAlways.onend=()=>{ if(ALWAYS) loop(); };
+    recAlways.onerror=()=>{ if(ALWAYS) loop(); };
+    try{ recAlways.start(); }catch(e){}
+  };
+  loop();
+  $$('.bar').forEach(b=>{ if(!b.querySelector('.lpill')){
+    const p=document.createElement('span'); p.className='lpill on';
+    p.innerHTML='<span class="d"></span>始终聆听';
+    b.appendChild(p); } });
+}
+function stopAlways(){ ALWAYS=false; try{ recAlways&&recAlways.stop(); }catch(e){} $$('.lpill').forEach(p=>p.classList.remove('on')); }
 function startVoice(){
   const mic=$('#mic'); mic.classList.add('rec');
+  $$('.gmic').forEach(m=>m.classList.add('rec')); showVoice();
   if(!SR){
     toast('此浏览器不支持语音识别 → 演示流程');
     setTimeout(()=>{ mic.classList.remove('rec'); voiceOnce(); },800); return;
@@ -572,7 +633,7 @@ function startVoice(){
     toast('请说：切成青色 / 换成玫瑰 / 用单色 / 换琥珀');
     rec.onresult = ev => applyVoiceText(ev.results[0][0].transcript);
     rec.onerror  = () => { toast('麦克风不可用（file:// 需改用 http://127.0.0.1）→ 演示流程'); mic.classList.remove('rec'); voiceOnce(); };
-    rec.onend    = () => mic.classList.remove('rec');
+    rec.onend    = () => { mic.classList.remove('rec'); $$('.gmic').forEach(m=>m.classList.remove('rec')); if(!ALWAYS) setTimeout(hideVoice,1200); };
     rec.start();
   }catch(e){ mic.classList.remove('rec'); voiceOnce(); }
 }
@@ -597,6 +658,14 @@ $('#layGrid2').addEventListener('click',()=>setLayout('grid'));
 $('#layFlow2').addEventListener('click',()=>setLayout('flow'));
 $('#mic').addEventListener('click',startVoice);
 $('#voiceBtn').addEventListener('click',startVoice);
+/* 全局入口：每页顶栏插入同一个麦克风（按一下即唤起） */
+$$('.bar').forEach(b=>{
+  if(b.querySelector('.gmic')) return;
+  const m=document.createElement('div'); m.className='mic gmic'; m.textContent='🎙';
+  b.appendChild(m); m.addEventListener('click',startVoice);
+});
+/* 键盘快捷：V 键 = 按一下说话（桌面评审用） */
+addEventListener('keydown',e=>{ if(e.key==='v'||e.key==='V') startVoice(); });
 $('#catBack').addEventListener('click',()=>show('home'));
 $('#readBack').addEventListener('click',()=>show('home'));
 $('#themeBack').addEventListener('click',()=>show('home'));
