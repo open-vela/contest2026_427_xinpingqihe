@@ -48,6 +48,7 @@ if(CONFIG_EXAMPLES_PHYWEAR)
     pw_font_28.c
     phywear_ui.c
     pw_theme.c
+    pw_glow.c
     phywear_raw.c
     phywear_pend.c
     phywear_spec.c
