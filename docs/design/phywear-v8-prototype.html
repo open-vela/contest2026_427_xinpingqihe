@@ -52,15 +52,15 @@
   .wash{position:absolute;inset:0;background:var(--accent);opacity:0;pointer-events:none;z-index:40;
         transition:opacity .45s ease-out}
 
-  .bar{height:56px;display:flex;align-items:center;padding:0 14px;position:relative;z-index:6;
+  .bar{height:56px;display:flex;align-items:center;padding:0 20px 0 14px;   /* 右侧 20px：时间/⋯/版本号左移一点点 */position:relative;z-index:6;
        border-bottom:1px solid var(--line);transition:border-color .6s}
   .bar .id{font-size:19px;font-weight:700}
-  .bar .sub{position:absolute;right:14px;font-size:12.5px;color:var(--fg3)}
+  .bar .sub{position:absolute;right:20px;font-size:12.5px;color:var(--fg3)}
   .back{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-pill);
         color:var(--fg2);font-size:21px;margin-left:-6px}
   .back:active{background:var(--card2)}
   .bar .ttl{font-size:16px;font-weight:600;margin-left:6px}
-  .bar .t{position:absolute;right:14px;font-size:12.5px;color:var(--fg2)}
+  .bar .t{position:absolute;right:20px;font-size:12.5px;color:var(--fg2);font-variant-numeric:tabular-nums}
   .mic{width:38px;height:38px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--card);
        color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px}
   .mic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
