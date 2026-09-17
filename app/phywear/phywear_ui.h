@@ -203,6 +203,8 @@ lv_obj_t *pw_ai_coach_screen(void);
 
 void pw_ui_root(void);
 
+lv_obj_t *pw_voice_screen(void);   /* 语音助手页（应答文案） */
+
 /* 直接打开某个板块列表页（诊断/截图用）：0=力学 1=声学 2=工具 3=计时器 4=生活 5=自定义
  * 返回 0 = 索引越界。真机 UI 与 cap 截图共用同一入口。 */
 int pw_ui_open_board(int idx);

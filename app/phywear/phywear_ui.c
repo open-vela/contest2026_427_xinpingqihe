@@ -376,7 +376,7 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   /* 顶栏右侧运行计时（phyphox 工具栏语义；进入测量屏后 1Hz 刷新 mm:ss） */
 
   lab = pw_label_new(bar, "", PW_FNT_SMALL, PW_COL_DIM);
-  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
+  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -24, 0);   /* 时间左移一点点 */
   g_pending_timer = lab;
 
   /* 内容区（下方全部区域，调用方可改尺寸） */
@@ -963,6 +963,11 @@ static void ui_about_open_cb(lv_event_t *e)
   pw_scr_open(pw_about_screen());
 }
 
+static void ui_voice_cb(lv_event_t *e)
+{
+  pw_scr_open(pw_voice_screen());
+}
+
 static void ui_settings_btn_cb(lv_event_t *e)
 {
   pw_scr_open(pw_settings_screen());
@@ -981,6 +986,30 @@ static void pw_ui_rebuild_root(void *ud)
     }
 
   pw_ui_root();
+}
+
+/* 语音助手页：应答文案（设备无离线 TTS/ASR，真识别需 Agent/网络，页面内如实标注） */
+
+lv_obj_t *pw_voice_screen(void)
+{
+  lv_obj_t *scr = pw_scr_new();
+  lv_obj_t *cont = pw_topbar(scr, "语音助手");
+  lv_obj_t *card;
+  lv_obj_t *lab;
+
+  card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 150, PW_COL_CARD);
+  lv_obj_set_pos(card, MENU_X0, MENU_GAP);
+
+  lab = pw_label_new(card, "\u4f60\u597d\uff0c\u6211\u662f\u8155\u4e0a\u7269\u7406\u5de5\u574a\u8bed\u97f3\u52a9\u624b",
+                     PW_FNT_MED, PW_COL_TEXT);
+  lv_obj_set_pos(lab, 16, 16);
+  lab = pw_label_new(card, "\u53ef\u8bf4\uff1a\u6253\u5f00\u5355\u6446 / \u56de\u4e3b\u9875 / \u6253\u5f00\u8bbe\u7f6e",
+                     PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(lab, 16, 58);
+  lab = pw_label_new(card, "\u79bb\u7ebf\u65e0\u8bed\u97f3\u8bc6\u522b\uff1a\u9700 Agent \u6216\u7f51\u7edc",
+                     PW_FNT_BODY, PW_COL_FAINT);
+  lv_obj_set_pos(lab, 16, 100);
+  return scr;
 }
 
 lv_obj_t *pw_settings_screen(void)
@@ -1143,6 +1172,21 @@ void pw_ui_root(void)
   lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(btn, ui_settings_btn_cb, LV_EVENT_CLICKED, NULL);
   pw_press_style(btn);
+
+  {
+    lv_obj_t *vb = lv_obj_create(scr);
+
+    lv_obj_set_size(vb, 56, 44);
+    lv_obj_set_pos(vb, PW_SCREEN_W - 60 - 20 - 56, 10);
+    lv_obj_set_style_bg_opa(vb, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(vb, 0, 0);
+    lv_obj_set_style_pad_all(vb, 0, 0);
+    lv_obj_remove_flag(vb, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(vb, ui_voice_cb, LV_EVENT_CLICKED, NULL);
+    pw_press_style(vb);
+    lab = pw_label_new(vb, "\u8bed", PW_FNT_MED, PW_COL_DIM);
+    lv_obj_center(lab);
+  }
 
   lab = pw_label_new(btn, "...", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
