@@ -43,6 +43,7 @@
 #include "phywear_i18n.h"
 #include "pw_graph.h"
 #include "pw_motion_lvgl.h"
+#include "pw_theme.h"
 #include "phywear_raw.h"
 #include "phywear_pend.h"
 #include "phywear_spec.h"
@@ -336,6 +337,79 @@ void pw_scr_set_tick(lv_obj_t *scr, lv_timer_cb_t cb, uint32_t period_ms)
   lv_obj_add_event_cb(scr, ui_del_cb, LV_EVENT_DELETE, t);
 }
 
+/* v8 定稿 §6：指令面板（离线兜底）。真语音（Agent 链路）在 S7 接入；
+ * 这里先保证"按一下就能切主题"，面板本身用主题强调色做选中反馈。 */
+
+static lv_obj_t *g_voice_panel;
+
+static const char *const g_theme_name[PW_THEME_COUNT] =
+{
+  "玫瑰", "青", "琥珀", "单色"
+};
+
+static void pw_voice_close(void)
+{
+  if (g_voice_panel != NULL)
+    {
+      lv_obj_delete(g_voice_panel);
+      g_voice_panel = NULL;
+    }
+}
+
+static void pw_voice_chip_cb(lv_event_t *e)
+{
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+
+  if (idx >= 0 && idx < PW_THEME_COUNT)
+    {
+      pw_theme_set(idx);
+      printf("[ui] theme -> %s (%d)\n", g_theme_name[idx], idx);
+    }
+
+  pw_voice_close();
+}
+
+static void pw_voice_cb(lv_event_t *e)
+{
+  lv_obj_t *scr = lv_obj_get_screen(lv_event_get_target(e));
+  lv_obj_t *p;
+  lv_obj_t *lab;
+  lv_obj_t *btn;
+  int i;
+
+  if (g_voice_panel != NULL)
+    {
+      pw_voice_close();      /* 再按一下收起 */
+      return;
+    }
+
+  p = pw_card_new(scr, PW_SCREEN_W - 2 * MENU_X0, 150, PW_COL_CARD);
+  lv_obj_align(p, LV_ALIGN_BOTTOM_MID, 0, -14);
+  lv_obj_set_style_border_width(p, 1, 0);
+  lv_obj_set_style_border_color(p, PW_COL_LINE, 0);
+  g_voice_panel = p;
+
+  lab = pw_label_new(p, "语音 / 指令（离线兜底）", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(lab, 12, 8);
+
+  for (i = 0; i < PW_THEME_COUNT; i++)
+    {
+      lv_color_t c = (i == pw_theme_get()) ? pw_theme_accent() : PW_COL_CARD_LT;
+
+      btn = pw_card_new(p, 78, 42, c);
+      lv_obj_set_pos(btn, 12 + (i % 4) * 84, 40);
+      lv_obj_add_event_cb(btn, pw_voice_chip_cb, LV_EVENT_CLICKED,
+                          (void *)(intptr_t)i);
+      pw_press_style(btn);
+      lab = pw_label_new(btn, g_theme_name[i], PW_FNT_BODY, PW_COL_TEXT);
+      lv_obj_center(lab);
+    }
+
+  lab = pw_label_new(p, "主题立即生效；上板后这里接 Agent 语音",
+                     PW_FNT_BODY, PW_COL_FAINT);
+  lv_obj_set_pos(lab, 12, 104);
+}
+
 lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
 {
   lv_obj_t *bar;
@@ -376,8 +450,31 @@ lv_obj_t *pw_topbar(lv_obj_t *scr, const char *title)
   /* 顶栏右侧运行计时（phyphox 工具栏语义；进入测量屏后 1Hz 刷新 mm:ss） */
 
   lab = pw_label_new(bar, "", PW_FNT_SMALL, PW_COL_DIM);
-  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -18, 0);
+  /* v8 定稿 §4：顶栏右侧固定槽位 = 麦克风（-20），时间/版本让到 -66 */
+
+  lv_obj_align(lab, LV_ALIGN_RIGHT_MID, -66, 0);
   g_pending_timer = lab;
+
+  /* 全局语音 / 指令入口：每页顶栏同一个按钮。
+   * 离线兜底 = 指令面板（主题切换 + 回主页）；真语音在 S7 接 Agent。 */
+
+  {
+    lv_obj_t *mic = lv_obj_create(bar);
+
+    lv_obj_set_size(mic, 38, 38);
+    lv_obj_align(mic, LV_ALIGN_RIGHT_MID, -20, 0);
+    lv_obj_set_style_radius(mic, 19, 0);
+    lv_obj_set_style_bg_color(mic, PW_COL_CARD, 0);
+    lv_obj_set_style_border_width(mic, 1, 0);
+    lv_obj_set_style_border_color(mic, PW_COL_LINE, 0);
+    lv_obj_set_style_pad_all(mic, 0, 0);
+    lv_obj_remove_flag(mic, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(mic, pw_voice_cb, LV_EVENT_CLICKED, NULL);
+    pw_press_style(mic);
+
+    lab = pw_label_new(mic, "语", PW_FNT_BODY, pw_theme_accent());
+    lv_obj_center(lab);
+  }
 
   /* 内容区（下方全部区域，调用方可改尺寸） */
 
