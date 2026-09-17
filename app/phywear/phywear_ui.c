@@ -1000,13 +1000,13 @@ lv_obj_t *pw_voice_screen(void)
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 150, PW_COL_CARD);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
 
-  lab = pw_label_new(card, "\u4f60\u597d\uff0c\u6211\u662f\u8155\u4e0a\u7269\u7406\u5de5\u574a\u8bed\u97f3\u52a9\u624b",
+  lab = pw_label_new(card, "我是腕上物理工坊语音助手",
                      PW_FNT_MED, PW_COL_TEXT);
   lv_obj_set_pos(lab, 16, 16);
-  lab = pw_label_new(card, "\u53ef\u8bf4\uff1a\u6253\u5f00\u5355\u6446 / \u56de\u4e3b\u9875 / \u6253\u5f00\u8bbe\u7f6e",
+  lab = pw_label_new(card, "可说：打开单摆 / 回主页 / 打开设置",
                      PW_FNT_BODY, PW_COL_DIM);
   lv_obj_set_pos(lab, 16, 58);
-  lab = pw_label_new(card, "\u79bb\u7ebf\u65e0\u8bed\u97f3\u8bc6\u522b\uff1a\u9700 Agent \u6216\u7f51\u7edc",
+  lab = pw_label_new(card, "离线：语音需 Agent 或网络",
                      PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 16, 100);
   return scr;
@@ -1184,7 +1184,7 @@ void pw_ui_root(void)
     lv_obj_remove_flag(vb, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(vb, ui_voice_cb, LV_EVENT_CLICKED, NULL);
     pw_press_style(vb);
-    lab = pw_label_new(vb, "\u8bed", PW_FNT_MED, PW_COL_DIM);
+    lab = pw_label_new(vb, "语", PW_FNT_MED, PW_COL_DIM);
     lv_obj_center(lab);
   }
 
