@@ -47,6 +47,7 @@ if(CONFIG_EXAMPLES_PHYWEAR)
     pw_font_24.c
     pw_font_28.c
     phywear_ui.c
+    pw_bt.c
     phywear_raw.c
     phywear_pend.c
     phywear_spec.c
@@ -79,5 +80,13 @@ if(CONFIG_EXAMPLES_PHYWEAR)
   if(CONFIG_SF32LB52_SPK)
     target_include_directories(apps_phywear PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/../../../vendor/sifli/boards/sf32lb52/drivers/audio)
+  endif()
+
+  # ---- 蓝牙阶段 B：zblue host 栈 ----
+  if(CONFIG_BT)
+    target_include_directories(apps_phywear PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../external/zblue/zblue/port/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../external/zblue/zblue/include)
+    target_link_libraries(apps_phywear PRIVATE zblue)
   endif()
 endif()
