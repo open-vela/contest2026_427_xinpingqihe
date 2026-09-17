@@ -63,11 +63,11 @@
 
 /* 主菜单宫格几何 */
 
-#define MENU_TILE_W    183
-#define MENU_TILE_H    88
+#define MENU_TILE_W    86    /* v8 定稿：4 列方形格 */
+#define MENU_TILE_H    92
 #define MENU_GAP       8
 #define MENU_X0        8
-#define MENU_Y0        70
+#define MENU_Y0        132   /* 让出顶部聚焦卡 */
 
 /****************************************************************************
  * Private Data
@@ -204,6 +204,31 @@ static void ui_back_cb(lv_event_t *e)
 /* P1 动效：tile 按压反馈（按下 y+2px，抬起回位；C4 snap 150ms）。
  * 只动 y 一个属性；user_data 传 tile 的基准 y（与 CLICKED 的 user_data 各用一套）。 */
 
+
+static lv_obj_t *g_focus_name;
+static lv_obj_t *g_focus_info;
+static const char *g_bname[8];
+static const char *g_binfo[8];
+
+static void ui_tile_focus_cb(lv_event_t *e)
+{
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+
+  if (g_focus_name == NULL || g_focus_info == NULL || idx < 0 || idx >= 8)
+    {
+      return;
+    }
+
+  if (g_bname[idx] != NULL)
+    {
+      lv_label_set_text(g_focus_name, g_bname[idx]);
+    }
+
+  if (g_binfo[idx] != NULL)
+    {
+      lv_label_set_text(g_focus_info, g_binfo[idx]);
+    }
+}
 
 static void ui_tile_cb(lv_event_t *e)
 {
@@ -1286,12 +1311,39 @@ void pw_ui_root(void)
   lab = pw_label_new(btn, "...", PW_FNT_XL, PW_COL_DIM);
   lv_obj_center(lab);
 
-  /* 板块宫格 2×4 */
+  /* 聚焦卡（v8 定稿 §4）：按住某格即更新 */
+
+  {
+    lv_obj_t *fc = pw_card_new(scr, PW_SCREEN_W - 2 * MENU_X0, 58, PW_COL_CARD);
+    lv_obj_t *fb;
+
+    lv_obj_set_pos(fc, MENU_X0, 62);
+    lv_obj_set_style_border_width(fc, 1, 0);
+    lv_obj_set_style_border_color(fc, pw_theme_accent(), 0);
+    lv_obj_set_style_border_opa(fc, LV_OPA_50, 0);
+
+    fb = lv_obj_create(fc);
+    lv_obj_set_size(fb, 3, 16);
+    lv_obj_set_pos(fb, 10, 12);
+    lv_obj_set_style_bg_color(fb, pw_theme_accent(), 0);
+    lv_obj_set_style_radius(fb, 2, 0);
+    lv_obj_set_style_border_width(fb, 0, 0);
+    lv_obj_remove_flag(fb, LV_OBJ_FLAG_SCROLLABLE);
+    pw_deco(fb);
+
+    g_focus_name = pw_label_new(fc, boards[0].name, PW_FNT_MED, PW_COL_TEXT);
+    lv_obj_set_pos(g_focus_name, 22, 8);
+
+    g_focus_info = pw_label_new(fc, boards[0].info, PW_FNT_BODY, PW_COL_DIM);
+    lv_obj_set_pos(g_focus_info, 22, 34);
+  }
+
+  /* 板块宫格 4×2 */
 
   for (i = 0; i < nboards; i++)
     {
-      int col = i % 2;
-      int row = i / 2;
+      int col = i % 4;              /* v8 定稿：4 列 × 2 行 */
+      int row = i / 4;
       int x = MENU_X0 + col * (MENU_TILE_W + MENU_GAP);
       int y = MENU_Y0 + row * (MENU_TILE_H + MENU_GAP);
       const struct pw_board_s *b = &boards[i];
@@ -1305,6 +1357,8 @@ void pw_ui_root(void)
       lv_obj_set_style_bg_color(tile, PW_COL_CARD_LT, LV_STATE_PRESSED);
       lv_obj_add_event_cb(tile, ui_tile_cb, LV_EVENT_CLICKED,
                           (void *)b->open);
+      g_bname[i] = b->name;
+      g_binfo[i] = b->info;
 #if PW_UI_MOTION
       /* 按压反馈走 pw_card_new() 里的统一按压样式（位移+底色，120ms C4）；
        * 这里只做**入场错峰**：8 块依次从 +12px 落位。EVENT_BUBBLE 让点在
@@ -1312,14 +1366,16 @@ void pw_ui_root(void)
 
       lv_obj_add_flag(tile, LV_OBJ_FLAG_EVENT_BUBBLE);
       pw_motion_slide_in_y_at(tile, y, 12, 240, (uint32_t)i * 40);
+      lv_obj_add_event_cb(tile, ui_tile_focus_cb, LV_EVENT_PRESSED,
+                          (void *)(intptr_t)i);
 #endif
 
       /* 板块图标：淡色圆底 + LV_SYMBOL 字形（内置 Montserrat 已含 symbols，
        * 不必重生成中文字体子集；字色用板块色，视觉上仍是"一区一色"） */
 
       chip = lv_obj_create(tile);
-      lv_obj_set_size(chip, 30, 30);
-      lv_obj_set_pos(chip, 12, 12);
+      lv_obj_set_size(chip, 32, 32);
+      lv_obj_set_pos(chip, (MENU_TILE_W - 32) / 2, 14);
       lv_obj_set_style_bg_color(chip, pw_theme_accent(), 0);
       lv_obj_set_style_bg_opa(chip, LV_OPA_20, 0);
       lv_obj_set_style_radius(chip, 9, 0);   /* 圆角方块（v2 观感） */
@@ -1343,11 +1399,14 @@ void pw_ui_root(void)
 
       name = pw_label_new(tile, b->name, PW_FNT_MED,
                           b->live ? PW_COL_TEXT : PW_COL_FAINT);
-      lv_obj_set_pos(name, 52, 12);
+      lv_obj_set_width(name, MENU_TILE_W - 8);
+      lv_label_set_long_mode(name, LV_LABEL_LONG_WRAP);
+      lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_pos(name, 4, 52);
 
       info = pw_label_new(tile, b->info, PW_FNT_BODY,
                           b->live ? PW_COL_DIM : PW_COL_FAINT);
-      lv_obj_set_pos(info, 50, 52);
+      lv_obj_add_flag(info, LV_OBJ_FLAG_HIDDEN);   /* 方形格放不下，交给聚焦卡 */
     }
 
   pw_scr_open(scr);
