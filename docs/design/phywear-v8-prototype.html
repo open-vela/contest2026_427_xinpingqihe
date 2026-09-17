@@ -254,7 +254,8 @@
       </div>
       <div class="blk">
         <div class="lb">Agent 语音（主动功能）</div>
-        <div class="iline" style="margin-top:6px"><span>对 Agent 说："切成青色" / "换成玫瑰" / "用单色"</span></div>
+        <div class="iline" style="margin-top:6px"><span>按下面按钮开始说话："切成青色" / "换成玫瑰" / "用单色" / "换琥珀"</span></div>
+        <div class="iline"><span style="color:var(--fg3)">浏览器真识别（Web Speech API）；用 file:// 打开会退回演示流程</span></div>
         <div class="acts"><span class="b pri" id="voiceBtn">🎙 说一句试试</span></div>
       </div>
       <div class="toast" id="toast"><span class="d"></span><span id="toastTx">已切换</span></div>
@@ -552,7 +553,31 @@ function buildThemeList(){
     <span class="rt${THEME===t[0]?'':' dim'}">${THEME===t[0]?'当前':'切换 ›'}</span></div>`).join('');
   $$('#themes .li').forEach(li=>li.addEventListener('click',()=>applyTheme(li.dataset.th,true)));
 }
-/* Agent 语音：模拟一轮"聆听→识别→渐变切换" */
+/* ---- 语音切主题：**真识别**优先（Web Speech API，需 http://localhost 或 https），失败回退演示 ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function applyVoiceText(t){
+  const map=[[/青|蓝|cyan/i,'cyan'],[/玫瑰|粉|红|rose/i,'rose'],[/琥珀|橙|黄|amber/i,'amber'],[/单色|黑白|灰|极简|mono/i,'mono']];
+  for(const [re,k] of map){ if(re.test(t)){ toast('识别：「'+t+'」'); applyTheme(k,true); return; } }
+  toast('没听清：「'+t+'」（可说：切成青色 / 换成玫瑰 / 用单色）');
+}
+function startVoice(){
+  const mic=$('#mic'); mic.classList.add('rec');
+  if(!SR){
+    toast('此浏览器不支持语音识别 → 演示流程');
+    setTimeout(()=>{ mic.classList.remove('rec'); voiceOnce(); },800); return;
+  }
+  try{
+    rec = new SR(); rec.lang='zh-CN'; rec.interimResults=false; rec.maxAlternatives=1;
+    toast('请说：切成青色 / 换成玫瑰 / 用单色 / 换琥珀');
+    rec.onresult = ev => applyVoiceText(ev.results[0][0].transcript);
+    rec.onerror  = () => { toast('麦克风不可用（file:// 需改用 http://127.0.0.1）→ 演示流程'); mic.classList.remove('rec'); voiceOnce(); };
+    rec.onend    = () => mic.classList.remove('rec');
+    rec.start();
+  }catch(e){ mic.classList.remove('rec'); voiceOnce(); }
+}
+
+/* 演示流程（真识别不可用时的兜底） */
 const VOICE=[['cyan','青'],['rose','玫瑰'],['mono','单色'],['amber','琥珀']];
 let voiceN=0;
 function voiceOnce(){
@@ -570,8 +595,8 @@ $('#layGrid').addEventListener('click',()=>setLayout('grid'));
 $('#layFlow').addEventListener('click',()=>setLayout('flow'));
 $('#layGrid2').addEventListener('click',()=>setLayout('grid'));
 $('#layFlow2').addEventListener('click',()=>setLayout('flow'));
-$('#mic').addEventListener('click',voiceOnce);
-$('#voiceBtn').addEventListener('click',voiceOnce);
+$('#mic').addEventListener('click',startVoice);
+$('#voiceBtn').addEventListener('click',startVoice);
 $('#catBack').addEventListener('click',()=>show('home'));
 $('#readBack').addEventListener('click',()=>show('home'));
 $('#themeBack').addEventListener('click',()=>show('home'));
