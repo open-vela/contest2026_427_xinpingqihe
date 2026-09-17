@@ -73,6 +73,19 @@
   .tile .gl{font-size:16px;color:var(--fg-2);line-height:1}
   .tile .nm{font-size:15.5px;font-weight:600;line-height:1.15}
   .tile .ct{font-size:12.5px;color:var(--fg-3);margin-top:auto}
+  .tile .spark{position:absolute;left:0;right:0;bottom:0;height:22px;opacity:.55;pointer-events:none}
+  .tile .spark polyline{fill:none;stroke:var(--accent);stroke-width:1.6}
+  .tile.focus .spark{opacity:.95}
+  .tile .ct.pulse{animation:none}
+  .ct.live{color:var(--accent);font-weight:600}
+  /* 按压：先缩、回弹过冲（C3 观感）；松手一次性涟漪 */
+  .tile.press,.row.press{transform:scale(.965)}
+  .tile.pop,.row.pop{transform:scale(1.035)}
+  .ring{position:absolute;inset:0;border:2px solid var(--accent);border-radius:inherit;
+        opacity:0;pointer-events:none;transform-origin:center}
+  /* 数值变化脉冲（D1：只在数值真的变化时闪一次） */
+  @keyframes d1{0%{opacity:1}35%{opacity:.45}100%{opacity:1}}
+  .d1{animation:d1 .18s ease-out 1}
   .tile.focus{background:var(--card-2);border-color:var(--accent);transform:scale(1.03)}
   .tile.dim{opacity:.55}
 
@@ -275,6 +288,14 @@ function wave(seed,w=366,h=104){
   }
   return p.join(' ');
 }
+function sparkPts(seed,t=0){
+  let p=[];
+  for(let i=0;i<=20;i++){
+    const y=11+Math.sin(i*0.62+seed*1.7+t)*7+Math.sin(i*0.21+seed+t*1.6)*3;
+    p.push(`${i*5},${Math.round(y)}`);
+  }
+  return p.join(' ');
+}
 function pager(el,n){
   el.innerHTML=''; const d=[];
   for(let i=0;i<n;i++){ const s=document.createElement('i'); el.appendChild(s); d.push(s); }
@@ -291,7 +312,13 @@ BOARDS.forEach((b,i)=>{
   el.style.left=(G.x0+col*(G.w+G.gx))+'px';
   el.style.top=(row*(G.h+G.gy))+'px';
   el.style.width=G.w+'px'; el.style.height=G.h+'px';
-  el.innerHTML=`<span style="display:flex;align-items:center;gap:7px"><span class="gl">${b.g}</span><span class="nm">${b.n}</span></span><span class="ct">${on(i)?on(i)+" 个实验":"规划中"}</span>`;
+  el.innerHTML=`<span style="display:flex;align-items:center;gap:7px"><span class="gl">${b.g}</span><span class="nm">${b.n}</span></span>
+    <span class="ct">${on(i)?on(i)+" 个实验":"规划中"}</span>
+    <svg class="spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline points="${sparkPts(i)}"/></svg>
+    <span class="ring"></span>`;
+  if(D){ el.style.opacity='0'; el.style.transform='translateY(10px) scale(.96)';
+         setTimeout(()=>{ el.style.transition='transform .3s cubic-bezier(.22,1,.36,1),opacity .3s';
+                          el.style.opacity='1'; el.style.transform='translateY(0) scale(1)'; }, 40+i*35); }
   grid.appendChild(el); tiles.push(el);
 });
 function renderFocus(){
@@ -302,6 +329,8 @@ function renderFocus(){
   const b=BOARDS[focus];
   $('#fName').textContent=b.n; $('#fDesc').textContent=b.d;
   $('#fCount').textContent=on(focus)+' 个实验';
+  /* 聚焦切换：名称与计数做一次 D1 脉冲（数据/交互驱动，不是常驻循环） */
+  ['#fName','#fCount'].forEach(sel=>{ const e=$(sel); e.classList.remove('d1'); void e.offsetWidth; e.classList.add('d1'); });
   pgHome.set(focus);
 }
 const watch=$('#watch');
@@ -316,8 +345,18 @@ function hit(p){
   return -1;
 }
 let hold=false,startF=0;
+function pressPop(el){
+  if(!D) return;
+  el.classList.add('press');
+  setTimeout(()=>{ el.classList.remove('press'); el.classList.add('pop');
+    setTimeout(()=>el.classList.remove('pop'),150); },90);
+  const ring=el.querySelector('.ring');
+  if(ring){ ring.style.transition='none'; ring.style.opacity='.9'; ring.style.transform='scale(1)';
+    requestAnimationFrame(()=>{ ring.style.transition='transform .34s cubic-bezier(.22,1,.36,1),opacity .34s';
+      ring.style.transform='scale(1.06)'; ring.style.opacity='0'; }); }
+}
 grid.addEventListener('pointerdown',e=>{ grid.setPointerCapture(e.pointerId); hold=true; startF=focus;
-  const i=hit(loc(e)); if(i>=0){ focus=i; renderFocus(); } });
+  const i=hit(loc(e)); if(i>=0){ focus=i; renderFocus(); pressPop(tiles[i]); } });
 grid.addEventListener('pointermove',e=>{ if(!hold) return;
   const i=hit(loc(e)); if(i>=0&&i!==focus){ focus=i; renderFocus(); } });
 grid.addEventListener('pointerup',e=>{ if(!hold) return; hold=false;
@@ -476,6 +515,25 @@ $('#resetBtn').addEventListener('click',()=>{ focus=0; pageX=0; pageIdx=0;
   $('#scr-home').style.transform=''; $('#scr-cat').style.transform=''; $('#full').classList.remove('on');
   show('home'); renderFocus(); renderRead(); });
 renderFocus(); renderRead();
+
+/* 数据心跳：真实设备上是 10~15 Hz 采样，这里用 600 ms 模拟；
+   只推进波形与"聚焦格的实时读数"，不做装饰性无限动画（§0.D）。 */
+const DEMO=[['−0.19','g'],['0.50','m'],['−58','dBFS'],['21.4','°'],['1.02','s'],['86','dB'],['—',''],['…','']];
+let tickN=0;
+setInterval(()=>{
+  tickN++;
+  tiles.forEach((el,i)=>{ const pl=el.querySelector('.spark polyline');
+    if(pl) pl.setAttribute('points',sparkPts(i,tickN*0.35)); });
+  const el=tiles[focus], ct=el.querySelector('.ct');
+  const d=DEMO[focus];
+  if(d && d[0]!=='—' && d[0]!=='…'){
+    const jitter=(Math.sin(tickN*1.3+focus)*0.02).toFixed(2);
+    ct.textContent=(parseFloat(d[0])+parseFloat(jitter)).toFixed(2)+' '+d[1];
+    ct.classList.add('live');
+  }
+  ct.classList.remove('d1'); void ct.offsetWidth; ct.classList.add('d1');   /* D1：数值变化脉冲 */
+},600);
+
 const H=(location.hash||'').replace('#','');
 if(H==='cat') openBoard(3); else if(H==='read'){ stack.push('read'); show('read'); }
 </script>
