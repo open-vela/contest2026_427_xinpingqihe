@@ -252,6 +252,48 @@ lv_obj_t *pw_scr_new(void)
   lv_obj_set_style_radius(scr, 0, 0);
   lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
+  /* v8 定稿 §7：底晕 —— 上下各一层 **2 段竖直线性渐变**（EPIC 唯一支持的渐变形态：
+   * 2 段 + 竖直 + radius 0），强度用"强调色与纯黑按比例混合"预计算成实色，
+   * 因为 LVGL 渐变没有透明度停靠点。创建在最前 → 天然在所有内容之下。 */
+
+  {
+    lv_obj_t *w1 = lv_obj_create(scr);
+    lv_obj_t *w2 = lv_obj_create(scr);
+
+    lv_obj_set_size(w1, PW_SCREEN_W, PW_SCREEN_H);
+    lv_obj_set_pos(w1, 0, 0);
+    lv_obj_set_size(w2, PW_SCREEN_W, PW_SCREEN_H);
+    lv_obj_set_pos(w2, 0, 0);
+
+    /* 顶部：强调色 16% → 黑 */
+
+    lv_obj_set_style_bg_color(w1, lv_color_mix(pw_theme_accent(), lv_color_black(),
+                                               PW_WASH_TOP * 255 / 100), 0);
+    lv_obj_set_style_bg_grad_color(w1, lv_color_black(), 0);
+    lv_obj_set_style_bg_grad_dir(w1, LV_GRAD_DIR_VER, 0);
+
+    /* 底部：黑 → 强调色 10%（方向反过来） */
+
+    lv_obj_set_style_bg_color(w2, lv_color_black(), 0);
+    lv_obj_set_style_bg_grad_color(w2, lv_color_mix(pw_theme_accent(),
+                                                     lv_color_black(),
+                                                     PW_WASH_BOTTOM * 255 / 100), 0);
+    lv_obj_set_style_bg_grad_dir(w2, LV_GRAD_DIR_VER, 0);
+
+    lv_obj_set_style_bg_opa(w1, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_opa(w2, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(w1, 0, 0);
+    lv_obj_set_style_radius(w2, 0, 0);
+    lv_obj_set_style_border_width(w1, 0, 0);
+    lv_obj_set_style_border_width(w2, 0, 0);
+    lv_obj_set_style_pad_all(w1, 0, 0);
+    lv_obj_set_style_pad_all(w2, 0, 0);
+    lv_obj_remove_flag(w1, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(w2, LV_OBJ_FLAG_SCROLLABLE);
+    pw_deco(w1);
+    pw_deco(w2);
+  }
+
   return scr;
 }
 
