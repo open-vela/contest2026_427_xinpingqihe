@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-17 23:52:14",
- "generated_at_epoch": 1789660334,
+ "generated_at": "2026-09-18 00:05:03",
+ "generated_at_epoch": 1789661103,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 203,
   "critical": 126,
-  "bytes": 9013151,
+  "bytes": 9008474,
   "missing_in_workspace": 0
  },
  "files": [
@@ -370,8 +370,8 @@
    "dst": "apps/examples/phywear/phywear_ui.c",
    "compare": "exact",
    "critical": true,
-   "md5": "8f4a8d901002bc715d604861ca30da2f",
-   "size": 52086,
+   "md5": "cf63587792067ac801c7674cd781b693",
+   "size": 47409,
    "present": true
   },
   {

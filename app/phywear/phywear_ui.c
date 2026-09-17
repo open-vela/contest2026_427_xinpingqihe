@@ -315,48 +315,6 @@ lv_obj_t *pw_scr_new(void)
   lv_obj_set_style_radius(scr, 0, 0);
   lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-  /* v8 定稿 §7：底晕 —— 上下各一层 **2 段竖直线性渐变**（EPIC 唯一支持的渐变形态：
-   * 2 段 + 竖直 + radius 0），强度用"强调色与纯黑按比例混合"预计算成实色，
-   * 因为 LVGL 渐变没有透明度停靠点。创建在最前 → 天然在所有内容之下。 */
-
-  {
-    lv_obj_t *w1 = lv_obj_create(scr);
-    lv_obj_t *w2 = lv_obj_create(scr);
-
-    lv_obj_set_size(w1, PW_SCREEN_W, PW_SCREEN_H);
-    lv_obj_set_pos(w1, 0, 0);
-    lv_obj_set_size(w2, PW_SCREEN_W, PW_SCREEN_H);
-    lv_obj_set_pos(w2, 0, 0);
-
-    /* 顶部：强调色 16% → 黑 */
-
-    lv_obj_set_style_bg_color(w1, lv_color_mix(pw_theme_accent(), lv_color_black(),
-                                               PW_WASH_TOP * 255 / 100), 0);
-    lv_obj_set_style_bg_grad_color(w1, lv_color_black(), 0);
-    lv_obj_set_style_bg_grad_dir(w1, LV_GRAD_DIR_VER, 0);
-
-    /* 底部：黑 → 强调色 10%（方向反过来） */
-
-    lv_obj_set_style_bg_color(w2, lv_color_black(), 0);
-    lv_obj_set_style_bg_grad_color(w2, lv_color_mix(pw_theme_accent(),
-                                                     lv_color_black(),
-                                                     PW_WASH_BOTTOM * 255 / 100), 0);
-    lv_obj_set_style_bg_grad_dir(w2, LV_GRAD_DIR_VER, 0);
-
-    lv_obj_set_style_bg_opa(w1, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_opa(w2, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(w1, 0, 0);
-    lv_obj_set_style_radius(w2, 0, 0);
-    lv_obj_set_style_border_width(w1, 0, 0);
-    lv_obj_set_style_border_width(w2, 0, 0);
-    lv_obj_set_style_pad_all(w1, 0, 0);
-    lv_obj_set_style_pad_all(w2, 0, 0);
-    lv_obj_remove_flag(w1, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(w2, LV_OBJ_FLAG_SCROLLABLE);
-    pw_deco(w1);
-    pw_deco(w2);
-  }
-
   return scr;
 }
 
@@ -1385,85 +1343,6 @@ void pw_ui_root(void)
 
   /* 一次性注册顶栏运行计时器（1Hz） */
   if (!g_timer_started)
-    {
-      g_timer_started = true;
-      lv_timer_create(ui_timer_tick, 1000, NULL);
-    }
-
-  scr = pw_scr_new();
-
-  /* 光斑（v8 定稿 §7）：96×96 A8 遮罩 + recolor 主题色。
-   * 紧跟底晕之后创建 → 天然位于"底晕之上、所有内容之下"（不要用 move_background，
-   * 那会把它压到不透明底晕下面，实测看不见）。 */
-
-  g_glow_a = lv_image_create(scr);
-  lv_image_set_src(g_glow_a, &pw_glow_dsc);
-  lv_obj_set_style_image_recolor(g_glow_a, pw_theme_accent(), 0);
-  lv_obj_set_style_image_recolor_opa(g_glow_a, LV_OPA_COVER, 0);
-  lv_obj_set_style_image_opa(g_glow_a, LV_OPA_50, 0);
-  lv_image_set_scale(g_glow_a, 256 * 4);
-  lv_obj_set_pos(g_glow_a, -120, -70);
-  pw_deco(g_glow_a);
-
-  g_glow_b = lv_image_create(scr);
-  lv_image_set_src(g_glow_b, &pw_glow_dsc);
-  lv_obj_set_style_image_recolor(g_glow_b, pw_theme_accent(), 0);
-  lv_obj_set_style_image_recolor_opa(g_glow_b, LV_OPA_COVER, 0);
-  lv_obj_set_style_image_opa(g_glow_b, LV_OPA_30, 0);
-  lv_image_set_scale(g_glow_b, 256 * 3);
-  lv_obj_set_pos(g_glow_b, 220, 250);
-  pw_deco(g_glow_b);
-
-  /* 标题行（左边缘圆弧屏切角：文本需右移进安全区） */
-
-  lab = pw_label_new(scr, PW_STR(UI_PHYWEAR), PW_FNT_XL, PW_COL_TEXT);
-  lv_obj_set_pos(lab, MENU_X0 + 28, 14);
-
-  lab = pw_label_new(scr, PW_STR(UI_SUBTITLE),
-                     PW_FNT_BODY, PW_COL_DIM);
-  lv_obj_set_pos(lab, MENU_X0 + 28, 46);
-
-  /* 右上角设置入口（phyphox 溢出菜单思想的极简版） */
-
-  btn = lv_obj_create(scr);
-  lv_obj_set_size(btn, 60, 44);
-  lv_obj_set_pos(btn, PW_SCREEN_W - 60 - 20, 10);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(btn, 0, 0);
-  lv_obj_set_style_pad_all(btn, 0, 0);
-  lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_add_event_cb(btn, ui_settings_btn_cb, LV_EVENT_CLICKED, NULL);
-  pw_press_style(btn);
-
-  lab = pw_label_new(btn, "...", PW_FNT_XL, PW_COL_DIM);
-  lv_obj_center(lab);
-
-  /* 聚焦卡（v8 定稿 §4）：按住某格即更新 */
-
-  {
-    lv_obj_t *fc = pw_card_new(scr, PW_SCREEN_W - 2 * MENU_X0, 58, PW_COL_CARD);
-    lv_obj_t *fb;
-
-    lv_obj_set_pos(fc, MENU_X0, 62);
-    lv_obj_set_style_border_width(fc, 1, 0);
-    lv_obj_set_style_border_color(fc, pw_theme_accent(), 0);
-    lv_obj_set_style_border_opa(fc, LV_OPA_50, 0);
-
-    fb = lv_obj_create(fc);
-    lv_obj_set_size(fb, 3, 16);
-    lv_obj_set_pos(fb, 10, 12);
-    lv_obj_set_style_bg_color(fb, pw_theme_accent(), 0);
-    lv_obj_set_style_radius(fb, 2, 0);
-    lv_obj_set_style_border_width(fb, 0, 0);
-    lv_obj_remove_flag(fb, LV_OBJ_FLAG_SCROLLABLE);
-    pw_deco(fb);
-
-    g_focus_name = pw_label_new(fc, boards[0].name, PW_FNT_MED, PW_COL_TEXT);
-    lv_obj_set_pos(g_focus_name, 22, 8);
-
-    g_focus_info = pw_label_new(fc, boards[0].info, PW_FNT_BODY, PW_COL_DIM);
-    lv_obj_set_pos(g_focus_info, 22, 34);
-  }
 
 
   /* 板块宫格 4×2 */
