@@ -1220,10 +1220,30 @@ lv_obj_t *pw_settings_screen(void)
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 118, PW_COL_CARD);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
+  /* S5-④：设置列表页 —— 细线分组 + 32px 图标块（v8 定稿页型④） */
+
+  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_radius(card, 0, 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_BOTTOM, 0);
+  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
+  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
+  {
+    lv_obj_t *ic = lv_obj_create(card);
+
+    lv_obj_set_size(ic, 32, 32);
+    lv_obj_set_pos(ic, 12, 16);
+    lv_obj_set_style_bg_color(ic, PW_COL_CARD_LT, 0);
+    lv_obj_set_style_radius(ic, 8, 0);
+    lv_obj_set_style_border_width(ic, 0, 0);
+    pw_deco(ic);
+    lab = pw_label_new(ic, "文", PW_FNT_BODY, pw_theme_accent());
+    lv_obj_center(lab);
+  }
 
   pw_section_bar(card, PW_ACC_ACTIVE, 16, 14);
   lab = pw_label_new(card, PW_STR(UI_LANGUAGE), PW_FNT_MED, PW_COL_TEXT);
-  lv_obj_set_pos(lab, 26, 12);
+  lv_obj_set_pos(lab, 54, 12);
 
   lab = pw_label_new(card, PW_STR(LANGUAGE_HINT), PW_FNT_BODY, PW_COL_FAINT);
   lv_obj_set_pos(lab, 16, 46);
@@ -1231,6 +1251,7 @@ lv_obj_t *pw_settings_screen(void)
   /* 英文按钮 */
   btn = pw_card_new(card, 120, 40, zh ? PW_COL_CARD_LT : PW_COL_CARD);
   lv_obj_set_pos(btn, 16, 70);
+  lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_bg_color(btn, zh ? PW_COL_CARD : PW_COL_CARD_LT,
                             LV_STATE_PRESSED);
   lab = pw_label_new(btn, PW_STR(LANG_EN), PW_FNT_MED,
@@ -1241,6 +1262,7 @@ lv_obj_t *pw_settings_screen(void)
   /* 中文按钮 */
   btn = pw_card_new(card, 120, 40, zh ? PW_COL_CARD_LT : PW_COL_CARD);
   lv_obj_set_pos(btn, 168, 70);
+  lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_bg_color(btn, zh ? PW_COL_CARD_LT : PW_COL_CARD,
                             LV_STATE_PRESSED);
   lab = pw_label_new(btn, PW_STR(LANG_ZH), PW_FNT_MED,
@@ -1251,7 +1273,27 @@ lv_obj_t *pw_settings_screen(void)
   /* --- 关于 --- */
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 64, PW_COL_CARD);
-  lv_obj_set_pos(card, MENU_X0, MENU_GAP + 130);
+
+  /* S5-④：设置列表页 —— 细线分组 + 32px 图标块（v8 定稿页型④） */
+
+  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_radius(card, 0, 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_BOTTOM, 0);
+  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
+  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
+  {
+    lv_obj_t *ic = lv_obj_create(card);
+
+    lv_obj_set_size(ic, 32, 32);
+    lv_obj_set_pos(ic, 12, 16);
+    lv_obj_set_style_bg_color(ic, PW_COL_CARD_LT, 0);
+    lv_obj_set_style_radius(ic, 8, 0);
+    lv_obj_set_style_border_width(ic, 0, 0);
+    pw_deco(ic);
+    lab = pw_label_new(ic, "?", PW_FNT_BODY, pw_theme_accent());
+    lv_obj_center(lab);
+  }  lv_obj_set_pos(card, MENU_X0, MENU_GAP + 130);
 
   lab = pw_label_new(card, PW_STR(UI_ABOUT), PW_FNT_MED, PW_COL_TEXT);
   lv_obj_set_pos(lab, 16, 20);
