@@ -1316,6 +1316,14 @@ lv_obj_t *pw_about_screen(void)
   cont = pw_topbar(scr, PW_STR(UI_ABOUT));
 
   card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 330, PW_COL_CARD);
+  /* S6：关于页按"页型④"改造 —— 去掉大圆角卡片，改细线分组（taste-skill §4.4） */
+
+  lv_obj_set_style_bg_opa(card, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_radius(card, 0, 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_border_side(card, LV_BORDER_SIDE_TOP, 0);
+  lv_obj_set_style_border_color(card, PW_COL_LINE, 0);
+  lv_obj_set_style_border_opa(card, LV_OPA_50, 0);
   lv_obj_set_pos(card, MENU_X0, MENU_GAP);
 
   lab = pw_label_new(card, "PhyWear v0.1", PW_FNT_LARGE, PW_ACC_ACTIVE);
