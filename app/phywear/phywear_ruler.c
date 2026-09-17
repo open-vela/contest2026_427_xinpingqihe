@@ -44,6 +44,7 @@
 #include <lvgl/lvgl.h>
 
 #include "phywear_ui.h"
+#include "pw_theme.h"
 #include "phywear_sensors.h"
 #include "pw_analysis.h"
 #include "pw_graph.h"
@@ -357,7 +358,7 @@ static void ruler_build_page_count(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
-  pw_section_bar(pg, R_ACC, 20, 6);
+  pw_section_bar(pg, pw_theme_accent(), 20, 6);
   lab = pw_label_new(pg, PW_STR(RULER_COUNT), PW_FNT_MED, R_ACC);
   lv_obj_set_pos(lab, 30, 4);
 
@@ -420,7 +421,7 @@ static void ruler_build_page_field(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
-  pw_section_bar(pg, R_ACC, 20, 6);
+  pw_section_bar(pg, pw_theme_accent(), 20, 6);
   lab = pw_label_new(pg, PW_STR(RULER_FIELD), PW_FNT_MED, R_ACC);
   lv_obj_set_pos(lab, 30, 4);
 
@@ -458,7 +459,7 @@ static void ruler_build_page_help(void)
   lv_obj_set_style_pad_all(pg, 0, 0);
   lv_obj_remove_flag(pg, LV_OBJ_FLAG_SCROLLABLE);
 
-  pw_section_bar(pg, R_ACC, 20, 6);
+  pw_section_bar(pg, pw_theme_accent(), 20, 6);
   lab = pw_label_new(pg, PW_STR(HELP), PW_FNT_MED, R_ACC);
   lv_obj_set_pos(lab, 30, 4);
 
