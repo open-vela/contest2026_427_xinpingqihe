@@ -64,6 +64,10 @@
   .mic{width:38px;height:38px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--card);
        color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px}
   .mic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .rgroup{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .set{width:38px;height:38px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--card);
+       color:var(--fg2);display:flex;align-items:center;justify-content:center;font-size:17px;letter-spacing:1px}
+  .set:active{background:var(--card2)}
 
   /* 内容块：圆角 0 + 细线分组（不再"卡片套卡片"） */
   .blk{border-top:1px solid var(--line);padding:12px 14px;transition:border-color .6s}
@@ -178,7 +182,8 @@
     <!-- 主页（宫格 / 卡片流 两套共存） -->
     <section class="screen on" id="scr-home">
       <div class="bar"><div class="id">PhyWear</div>
-        <div class="sub">腕上物理工坊</div></div>
+        <div class="rgroup"><span class="sub" style="position:static">腕上物理工坊</span>
+          <span class="set" id="setBtn">⋯</span></div></div>
       <div class="blk" style="border-top:0">
         <div class="lb">当前模块</div>
         <div class="big"><span class="v" id="fName" style="font-size:26px">传感器</span></div>
@@ -209,6 +214,13 @@
         <div class="t mono" id="readIdx">1 / 6</div></div>
       <div id="pages"></div>
       <div class="segs" id="segsRead"></div>
+    </section>
+
+    <!-- 设置列表页（主页 ⋯ 进入；主题与布局是其中一项） -->
+    <section class="screen" id="scr-set">
+      <div class="bar"><div class="back" id="setBack">‹</div><div class="ttl">设置</div><div class="t">v0.1</div></div>
+      <div id="setRows"></div>
+      <div style="padding:12px 14px;font-size:12px;color:#5E5E5E">点「主题与布局」可换主题 / 换主页布局 / 用语音切换</div>
     </section>
 
     <!-- 主题 / 布局页 -->
@@ -245,6 +257,7 @@
     <button data-scr="home" class="on">主页</button>
     <button data-scr="cat">板块页</button>
     <button data-scr="read">读数页</button>
+    <button data-scr="set">设置</button>
     <button data-scr="theme">主题/布局</button>
     <span class="sp"></span>
     <b style="font-size:12.5px;color:var(--fg3);font-weight:400">主题</b>
@@ -487,6 +500,28 @@ watch.addEventListener('pointerup',e=>{
   const idx=Math.max(0,Math.min(N-1,Math.round((pageIdx*390-dx+(dx>0?90:-90))/390)));
   const from=pageX; tween(from,idx*390,x=>{pageX=x;renderRead();},270); pageIdx=idx; readP=null;
 });
+/* 设置列表页（第 4 种页型：图标块行 + 右侧当前值） */
+const SETROWS=[
+  ['◑','主题与布局','主题 / 主页布局 / 语音切换','theme'],
+  ['文','语言','界面语言','中文 ›'],
+  ['屏','屏幕常亮','测量时保持亮屏','开 ›'],
+  ['存','数据导出','CSV · 通过串口','可用 ›'],
+  ['◷','采样率','原始传感器页刷新','10 Hz ›'],
+  ['?','关于 PhyWear','版本 / 许可 / 归属','v0.1 ›'],
+];
+function buildSetRows(){
+  const el=$('#setRows'); if(!el) return;
+  el.innerHTML=SETROWS.map(r=>`<div class="li" data-go="${r[3]||''}">
+    <span class="ic">${r[0]}</span>
+    <span class="tx"><span class="nm">${r[1]}</span><span class="mt">${r[2]}</span></span>
+    <span class="rt">${r[3]==='theme'?'进入 ›':r[3]}</span></div>`).join('');
+  $$('#setRows .li').forEach(li=>li.addEventListener('click',()=>{
+    const g=li.dataset.go;
+    if(g==='theme') { show('theme'); }
+    else if(g) toast('（演示）'+g);
+  }));
+}
+
 /* 主题页列表 */
 function buildThemeList(){
   const el=$('#themes'); if(!el) return;
@@ -519,10 +554,13 @@ $('#voiceBtn').addEventListener('click',voiceOnce);
 $('#catBack').addEventListener('click',()=>show('home'));
 $('#readBack').addEventListener('click',()=>show('home'));
 $('#themeBack').addEventListener('click',()=>show('home'));
+$('#setBtn').addEventListener('click',()=>show('set'));
+$('#setBack').addEventListener('click',()=>show('home'));
 $$('.chart').forEach(c=>c.addEventListener('click',()=>toast('图表放大（上板接 pw_scope 全屏）')));
-applyTheme(THEME,false); setLayout(LAYOUT); renderHome(); renderRead();
+applyTheme(THEME,false); setLayout(LAYOUT); buildSetRows(); renderHome(); renderRead();
 const H=(location.hash||'').replace('#','');
-if(H==='cat') openBoard(3); else if(H==='read') show('read'); else if(H==='theme') show('theme');
+if(H==='cat') openBoard(3); else if(H==='read') show('read');
+else if(H==='theme') show('theme'); else if(H==='set') show('set');
 </script>
 </body>
 </html>
