@@ -790,7 +790,7 @@ lv_obj_t *pw_board_list(const char *title, lv_color_t accent,
           lv_obj_set_size(strip, 3, 36);
           lv_obj_set_pos(strip, 10, 14);
           pw_deco(strip);
-          lv_obj_set_style_bg_color(strip, accent, 0);
+          lv_obj_set_style_bg_color(strip, pw_theme_accent(), 0);   /* 全局单一强调色 */
           lv_obj_set_style_radius(strip, 2, 0);
           lv_obj_set_style_border_width(strip, 0, 0);
           lv_obj_remove_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
@@ -1320,7 +1320,7 @@ void pw_ui_root(void)
       chip = lv_obj_create(tile);
       lv_obj_set_size(chip, 30, 30);
       lv_obj_set_pos(chip, 12, 12);
-      lv_obj_set_style_bg_color(chip, lv_color_hex(b->color), 0);
+      lv_obj_set_style_bg_color(chip, pw_theme_accent(), 0);
       lv_obj_set_style_bg_opa(chip, LV_OPA_20, 0);
       lv_obj_set_style_radius(chip, 9, 0);   /* 圆角方块（v2 观感） */
       lv_obj_set_style_border_width(chip, 0, 0);
@@ -1330,12 +1330,12 @@ void pw_ui_root(void)
       if (b->draw != 0)
         {
           tile_draw_icon(chip, b->draw,
-                         b->live ? lv_color_hex(b->color) : PW_COL_FAINT);
+                         b->live ? pw_theme_accent() : PW_COL_FAINT);
         }
       else
         {
           lab = pw_label_new(chip, b->icon, &lv_font_montserrat_20,
-                             b->live ? lv_color_hex(b->color) : PW_COL_FAINT);
+                             b->live ? pw_theme_accent() : PW_COL_FAINT);
           lv_obj_center(lab);
         }
 
