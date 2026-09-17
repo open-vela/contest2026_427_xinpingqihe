@@ -48,6 +48,7 @@
 用户已确认两项降级：中心聚焦不做真缩放（→框宽高+邻项降透明+描边）、速度形变不做 skew（→强调条伸缩+卡片宽度微变）。
 原型 `docs/design/phywear-v31-prototype.html`（`?still=1#cat` 静态入口），渲染图 `docs/design/v31-0{1,2}-*.png`。
 **仍未上板** —— 等用户对这一版点头后，先做主页 + 板块页两屏真机验证（帧率 A/B + SRAM 核对 + 截图），再铺其余页。 |
+| **v4 原型：严格按实名风格重做（2026-09-17）** | 用户判定 v3.1「太AI」，要求**严格选 ui-ux-pro-max 里的风格**，并给出新 Skill `github.com/Leonxlnx/taste-skill`（本机 hosts 把 github.com 指到 127.0.0.1，改用 `api.github.com`/`raw.githubusercontent.com` + `curl -k` 取件）。**Design Read**：手持科学仪器 UI（导航+实时读数+图表）→ `Swiss Modernism 2.0`（12 列网格/8px 基准/单一强调色/无装饰）+ `Data-Dense Dashboard`（gap 8px/padding 12px/小字 12px/header 56px）+ `Dark Mode (OLED)`（#000000 底 + #121212 表面，对比 21:1）+ `Minimal & Direct`（列表）。旋钮 `VARIANCE 4 / MOTION 3 / DENSITY 7`。照 taste-skill 修正三处根因：① **全局只 1 个强调色** Emerald `#22C55E`（删掉 8 色强调，违反 §4.2 Color Consistency Lock）；② **删掉紫色渐晕 hero**（§0.D/§4.2 点名的 AI-purple 默认货）；③ **圆角一律 0**（§4.4 Shape Consistency Lock，同时是 EPIC 直通路径），状态点/分页都做矩形。另遵守 §6.A「只动 transform/opacity」（分页改 `scaleX`、共享元素改 translate+scale）、§5.D（无滚动监听/常驻 rAF）、§6.B（`prefers-reduced-motion` 退化）。原型 `docs/design/phywear-v4-prototype.html`（`?still=1#cat` 静态入口），图 `docs/design/v4-0{1,2,3}-*.png`，skill 原文存 `docs/design/ref-taste-skill.md`。**仍未上板** —— 等用户确认这版气质后再动 LVGL（先主屏 + 板块页）。 |
 | 回退点 | `~/桌面/PhyWear-rollback-20260915-0002/`（含改动前固件 `484b64ca…`，本批真机 A/B 用的就是它；`rollback.sh --check`） |
 | 迁移包 | `~/桌面/PhyWear-migrate-20260914.zip` |
 
