@@ -65,25 +65,24 @@
   .bar{height:56px;display:flex;align-items:center;padding:0 20px 0 14px;   /* 右侧 20px：时间/⋯/版本号左移一点点 */position:relative;z-index:6;
        border-bottom:1px solid var(--line);transition:border-color .6s}
   .bar .id{font-size:19px;font-weight:700}
-  .bar .sub{position:absolute;right:20px;font-size:12.5px;color:var(--fg3)}
+  .bar .sub{position:absolute;right:66px;font-size:12.5px;color:var(--fg3)}   /* 让开右侧麦克风槽位 */
   .back{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-pill);
         color:var(--fg2);font-size:21px;margin-left:-6px}
   .back:active{background:var(--card2)}
   .bar .ttl{font-size:16px;font-weight:600;margin-left:6px}
-  .bar .t{position:absolute;right:20px;font-size:12.5px;color:var(--fg2);font-variant-numeric:tabular-nums}
+  .bar .t{position:absolute;right:66px;font-size:12.5px;color:var(--fg2);font-variant-numeric:tabular-nums}
   .mic{width:38px;height:38px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--card);
        color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px}
   .mic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
-  .rgroup{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .rgroup{margin-left:auto;display:flex;align-items:center;gap:8px;padding-right:46px}  /* ⋯ 也让开麦克风 */
   /* 全局语音：所有页顶栏同一个入口（不用进设置页） */
-  .gmic{position:absolute;right:52px;top:9px;width:38px;height:38px;border-radius:var(--r-pill);
+  .gmic{position:absolute;right:20px;top:9px;width:38px;height:38px;border-radius:var(--r-pill);
         border:1px solid var(--line);background:var(--card);color:var(--accent);
         display:flex;align-items:center;justify-content:center;font-size:15px;z-index:8}
   .gmic.rec{background:var(--accent);color:var(--ink);border-color:var(--accent)}
-  .lpill{position:absolute;left:14px;bottom:-1px;transform:translateY(100%);display:none;align-items:center;gap:6px;
-         font-size:11.5px;color:var(--accent);z-index:9}
-  .lpill.on{display:flex}
-  .lpill .d{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:d1 1.2s ease-in-out infinite}
+  .lpill{display:none}                       /* 旧的一行字提示：废弃，改用麦克风角标 */
+  .gmic.listening::after{content:'';position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;
+        border-radius:50%;background:var(--accent);border:2px solid var(--bg);animation:d1 1.2s ease-in-out infinite}
   .vpanel{position:absolute;left:14px;right:14px;bottom:16px;background:var(--card2);border:1px solid var(--line2);
           border-radius:16px;padding:12px 14px;z-index:60;display:none}
   .vpanel.on{display:block}
@@ -615,12 +614,9 @@ function startAlways(){
     try{ recAlways.start(); }catch(e){}
   };
   loop();
-  $$('.bar').forEach(b=>{ if(!b.querySelector('.lpill')){
-    const p=document.createElement('span'); p.className='lpill on';
-    p.innerHTML='<span class="d"></span>始终聆听';
-    b.appendChild(p); } });
+  $$('.gmic').forEach(m=>m.classList.add('listening'));      /* 角标小圆点=始终聆听中 */
 }
-function stopAlways(){ ALWAYS=false; try{ recAlways&&recAlways.stop(); }catch(e){} $$('.lpill').forEach(p=>p.classList.remove('on')); }
+function stopAlways(){ ALWAYS=false; try{ recAlways&&recAlways.stop(); }catch(e){} $$('.gmic').forEach(m=>m.classList.remove('listening')); }
 function startVoice(){
   const mic=$('#mic'); mic.classList.add('rec');
   $$('.gmic').forEach(m=>m.classList.add('rec')); showVoice();
