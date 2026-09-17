@@ -1306,6 +1306,28 @@ void pw_ui_root(void)
 
   scr = pw_scr_new();
 
+  /* 光斑（v8 定稿 §7）：96×96 A8 遮罩 + recolor 主题色。
+   * 紧跟底晕之后创建 → 天然位于"底晕之上、所有内容之下"（不要用 move_background，
+   * 那会把它压到不透明底晕下面，实测看不见）。 */
+
+  g_glow_a = lv_image_create(scr);
+  lv_image_set_src(g_glow_a, &pw_glow_dsc);
+  lv_obj_set_style_image_recolor(g_glow_a, pw_theme_accent(), 0);
+  lv_obj_set_style_image_recolor_opa(g_glow_a, LV_OPA_COVER, 0);
+  lv_obj_set_style_image_opa(g_glow_a, LV_OPA_50, 0);
+  lv_image_set_scale(g_glow_a, 256 * 4);
+  lv_obj_set_pos(g_glow_a, -120, -70);
+  pw_deco(g_glow_a);
+
+  g_glow_b = lv_image_create(scr);
+  lv_image_set_src(g_glow_b, &pw_glow_dsc);
+  lv_obj_set_style_image_recolor(g_glow_b, pw_theme_accent(), 0);
+  lv_obj_set_style_image_recolor_opa(g_glow_b, LV_OPA_COVER, 0);
+  lv_obj_set_style_image_opa(g_glow_b, LV_OPA_30, 0);
+  lv_image_set_scale(g_glow_b, 256 * 3);
+  lv_obj_set_pos(g_glow_b, 220, 250);
+  pw_deco(g_glow_b);
+
   /* 标题行（左边缘圆弧屏切角：文本需右移进安全区） */
 
   lab = pw_label_new(scr, PW_STR(UI_PHYWEAR), PW_FNT_XL, PW_COL_TEXT);
@@ -1357,30 +1379,6 @@ void pw_ui_root(void)
     lv_obj_set_pos(g_focus_info, 22, 34);
   }
 
-  /* 光斑（v8 定稿 §7）：96×96 A8 遮罩 + recolor 主题色；两张、跟随聚焦模块漂移。
-   * 创建后用 move_background() 压到最底层（在底晕之上、所有内容之下）。 */
-
-  {
-    g_glow_a = lv_image_create(scr);
-    lv_image_set_src(g_glow_a, &pw_glow_dsc);
-    lv_obj_set_style_image_recolor(g_glow_a, pw_theme_accent(), 0);
-    lv_obj_set_style_image_recolor_opa(g_glow_a, LV_OPA_COVER, 0);
-    lv_obj_set_style_image_opa(g_glow_a, LV_OPA_40, 0);
-    lv_image_set_scale(g_glow_a, 256 * 4);
-    lv_obj_set_pos(g_glow_a, -120, -70);
-    lv_obj_move_background(g_glow_a);
-    pw_deco(g_glow_a);
-
-    g_glow_b = lv_image_create(scr);
-    lv_image_set_src(g_glow_b, &pw_glow_dsc);
-    lv_obj_set_style_image_recolor(g_glow_b, pw_theme_accent(), 0);
-    lv_obj_set_style_image_recolor_opa(g_glow_b, LV_OPA_COVER, 0);
-    lv_obj_set_style_image_opa(g_glow_b, LV_OPA_20, 0);
-    lv_image_set_scale(g_glow_b, 256 * 3);
-    lv_obj_set_pos(g_glow_b, 220, 250);
-    lv_obj_move_background(g_glow_b);
-    pw_deco(g_glow_b);
-  }
 
   /* 板块宫格 4×2 */
 
