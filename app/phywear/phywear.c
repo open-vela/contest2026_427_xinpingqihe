@@ -76,6 +76,7 @@
 #include "phywear_sensors.h"
 #include "phywear_ui.h"
 #include "pw_btprobe.h"
+#include "pw_net.h"
 #if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
 #  include <demos/benchmark/lv_demo_benchmark.h>
 #endif
@@ -975,6 +976,13 @@ int main(int argc, FAR char *argv[])
   if (argc > 1 && strcmp(argv[1], "bthci") == 0)
     {
       pw_bt_probe();
+      return 0;
+    }
+
+  /* 任务 3 的替代通路：USB CDC-ACM + SLIP（本板无无线网卡，见 pw_net.c 注释） */
+  if (argc > 1 && strcmp(argv[1], "net") == 0)
+    {
+      pw_net_up();
       return 0;
     }
 

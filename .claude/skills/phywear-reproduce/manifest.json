@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 14:57:39",
- "generated_at_epoch": 1789714659,
+ "generated_at": "2026-09-18 15:04:34",
+ "generated_at_epoch": 1789715074,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 211,
-  "critical": 134,
-  "bytes": 9084432,
+  "files": 213,
+  "critical": 136,
+  "bytes": 9087687,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "c64a81fcff9e8a943bbf021c6058a605",
-   "size": 2822,
+   "md5": "cdbc3eff5d16388ccd85b714e3b3d9f9",
+   "size": 2835,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "335658d308cea6d7a9bb294d612f4c8a",
-   "size": 59448,
+   "md5": "6baf2afd4cee8f213d55ec6cd6602285",
+   "size": 59666,
    "present": true
   },
   {
@@ -680,6 +680,28 @@
    "critical": true,
    "md5": "a970b6c0365e0a9d04c9337075ffc815",
    "size": 6626,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_net.c",
+   "dst": "apps/examples/phywear/pw_net.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "f1284e7aa79dbb48c392a3f8cb6c8524",
+   "size": 2323,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_net.h",
+   "dst": "apps/examples/phywear/pw_net.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "2e1abe13e8edd9364bdb423a3c70c3c4",
+   "size": 550,
    "present": true
   },
   {
@@ -1426,8 +1448,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "9b3680715fccaab6e52ce61e37859b4d",
-   "size": 9545,
+   "md5": "a7768500e0caadd049adb532d500e246",
+   "size": 9696,
    "present": true
   },
   {
