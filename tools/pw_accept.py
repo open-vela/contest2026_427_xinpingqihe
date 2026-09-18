@@ -161,6 +161,16 @@ def main():
             bool(m) and int(m.group(1)) == -107,
             m.group(0) if m else "未打印")
 
+    # 句柄结构：注册后 handle 必须非 0，且 CCC 紧跟特征值（通知靠这条解析）
+    m = re.search(r"handles: value=0x([0-9a-f]+) ccc=0x([0-9a-f]+)", txt_b)
+    if m:
+        v, c = int(m.group(1), 16), int(m.group(2), 16)
+        rep.add("B2b 句柄结构 value!=0 且 ccc==value+1", v != 0 and c == v + 1,
+                f"value=0x{v:04x} ccc=0x{c:04x}")
+    else:
+        rep.add("B2b 句柄结构 value!=0 且 ccc==value+1", False, "未打印")
+    rep.add("B2b 有属性 handle=0", "有属性 handle=0" not in txt_b)
+
     rep.add("B2b 全程无 RX 读错误", "rx read errno" not in txt_b)
 
     # ── R1：帧率 ───────────────────────────────────────────────────────

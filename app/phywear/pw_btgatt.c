@@ -350,10 +350,47 @@ static int pw_btgatt_selftest(void)
       char u[BT_UUID_STR_LEN];
 
       bt_uuid_to_str(a->uuid, u, sizeof(u));
-      printf("[bt] SELFTEST attr[%u] %s perm=0x%02x read=%c write=%c\n",
-             (unsigned)i, u, a->perm, a->read ? 'Y' : '-',
+      printf("[bt] SELFTEST attr[%u] handle=0x%04x %s perm=0x%02x read=%c write=%c\n",
+             (unsigned)i, a->handle, u, a->perm, a->read ? 'Y' : '-',
              a->write ? 'Y' : '-');
     }
+
+  /* ①b 句柄结构自检。
+   * 为什么只看 UUID/权限不够：`handle` 是 `bt_gatt_service_register()` **注册时**
+   * 才写进属性的。若注册没真正生效，handle 会是 0 —— 那样手机来的 ATT 请求
+   * 会全部找不到东西，而日志上"UUID/权限都对"看不出任何异常。
+   * 另外通知能发出去的前提是：**CCC 紧跟在特征值后面**（标准四段布局
+   * service-decl / chrc-decl / chrc-value / CCC），zblue 的 notify 正是靠
+   * `bt_gatt_attr_value_handle()` 拿到值句柄、再据它找到对应的 CCC。
+   * 这里把这两条都断言下来。 */
+  {
+    int all_nonzero = 1;
+
+    for (i = 0; i < ARRAY_SIZE(pw_attrs); i++)
+      {
+        if (pw_attrs[i].handle == 0)
+          {
+            all_nonzero = 0;
+          }
+      }
+
+    printf("[bt] SELFTEST handles: value=0x%04x ccc=0x%04x (ccc 应为 value+1)\n",
+           pw_attrs[PW_ATTR_SENSOR_VALUE].handle,
+           pw_attrs[PW_ATTR_SENSOR_VALUE + 1].handle);
+
+    if (!all_nonzero)
+      {
+        printf("[bt] SELFTEST FAIL 有属性 handle=0 ⇒ 服务没真正注册\n");
+        fails++;
+      }
+
+    if (pw_attrs[PW_ATTR_SENSOR_VALUE + 1].handle !=
+        pw_attrs[PW_ATTR_SENSOR_VALUE].handle + 1)
+      {
+        printf("[bt] SELFTEST FAIL CCC 不紧跟特征值 ⇒ 通知可能发不出去\n");
+        fails++;
+      }
+  }
 
   /* ② 读路径：先采样，再走真实 read helper。
    * 这里顺便把采样耗时**量出来**打印 —— 「预算 200 ms」不能只是注释里的一句话，
