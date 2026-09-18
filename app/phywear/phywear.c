@@ -1755,10 +1755,46 @@ int main(int argc, FAR char *argv[])
             struct timespec sh;
             int settle = (shot_idx >= PW_SHOT_MAIN_COUNT) ? shot_p2_settle_ms
                                                           : shot_settle_ms;
+            long waited;
 
             clock_gettime(CLOCK_MONOTONIC, &sh);
-            if (((sh.tv_sec - shot_t0.tv_sec) * 1000 +
-                 (sh.tv_nsec - shot_t0.tv_nsec) / 1000000) >= settle)
+            waited = ((sh.tv_sec - shot_t0.tv_sec) * 1000 +
+                      (sh.tv_nsec - shot_t0.tv_nsec) / 1000000);
+
+            /* 蓝牙页的取证等待（**仅 shot 模式**）。
+             *
+             * 为什么需要：这一页要证明的恰恰是"连上以后长什么样" ——
+             * 未连接时点是灰的、日志是空的，截出来什么都证明不了；
+             * 而"连上"是**外部行为**（宿主的 BLE 中心设备发起连接），
+             * 板子只能等。等的时候 LVGL 照常跑，指示点/状态字本来就会
+             * 随 pw_bt_link() 自己变蓝。
+             *
+             * 因此：shot 模式截 btlink 时，最多多等
+             * PW_SHOT_BT_WAIT_MS，一旦链路起来就立刻出图（宿主侧实测
+             * ~7 s 连上）。超时也照出图（打印 WAIT-TIMEOUT），
+             * 免得把"没连上"伪装成"连上了"。 */
+            if (shot_once && cap_screen != NULL &&
+                strcmp(cap_screen, "btlink") == 0 &&
+                !pw_bt_link()->connected && waited < settle + PW_SHOT_BT_WAIT_MS)
+              {
+                if (waited >= settle && waited - settle < 1000)
+                  {
+                    printf("[phywear] BT shot: 等链路起来 ……\n");
+                    fflush(stdout);
+                  }
+
+                continue;                     /* 继续跑 GUI，稍后再判 */
+              }
+
+            if (shot_once && cap_screen != NULL &&
+                strcmp(cap_screen, "btlink") == 0 &&
+                !pw_bt_link()->connected)
+              {
+                printf("[phywear] BT shot: WAIT-TIMEOUT 未连上，按未连接状态出图\n");
+                fflush(stdout);
+              }
+
+            if (waited >= settle)
               {
                 const char *sname;
 
