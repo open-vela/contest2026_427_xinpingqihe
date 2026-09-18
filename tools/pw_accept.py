@@ -34,8 +34,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from pw_serial import Session, dump, log  # noqa: E402
 
-# UI 金标：改动前的主页 sha256（docs/evidence/voice-20260918/02_home_with_voice_entry.png）
-GOLDEN_ROOT_SHA = "d552c57bba5f8c07c1388626419ffc14f03329dd3ac3fff15bb739c7afca8dbc"
+# UI 金标：主页 sha256。
+#
+# 2026-09-18 换过一次（这是**有意的改版**，不是回归）：
+#   旧 d552c57b… = 加"蓝牙链路指示"之前（voice-20260918/02_home_with_voice_entry.png）
+#   新 e356689d… = 加了标题右侧那枚"灰点 + 蓝牙"之后
+# 未连接时是灰的、已连接时变蓝（蓝色状态见
+# docs/evidence/btui-20260918/root_connected.png）。
+# 这个检查的作用因此从"UI 没变"变成"主页与当前金标逐字节一致" ——
+# 任何**非预期**的版式/配色改动仍然会被它抓住。
+GOLDEN_ROOT_SHA = "e356689dc9e32387b5a9f121d23f6404ee52ca4e33bc4d8bd8267a535f0f7bfe"
 
 PWSHOT = os.path.join(HERE, "pwshot.py")
 
@@ -205,22 +213,21 @@ def main():
                 [sys.executable, PWSHOT, "shot", "root", "--out", shotdir,
                  "--label", "root", "--settle", "12000", "--timeout", "140",
                  "--retries", "3"],
-                capture_output=True, text=True,
-                env=dict(os.environ, PWSHOT_TOLERANCE="400"))
+                capture_output=True, text=True)
             png = os.path.join(shotdir, "root.png")
             if os.path.exists(png):
                 got = png
                 break
-            log(f"  截图第 {attempt} 次没出（pwshot 行一致性抖动），重试")
+            log(f"  截图第 {attempt} 次没出（pwshot 逐行校验，周期重绘会撕行），重试")
         if got:
             data = open(got, "rb").read()
             sha = hashlib.sha256(data).hexdigest()
             rep.add("R2 主页截图 >5KB", len(data) > 5120, f"{len(data)} B")
-            rep.add("R2 主页 sha256 == 金标(UI 未变)", sha == GOLDEN_ROOT_SHA,
+            rep.add("R2 主页 sha256 == 金标", sha == GOLDEN_ROOT_SHA,
                     sha[:16] + "…")
         else:
             rep.add("R2 主页截图 >5KB", False, "3 次都没抓到")
-            rep.add("R2 主页 sha256 == 金标(UI 未变)", False, "无图可比")
+            rep.add("R2 主页 sha256 == 金标", False, "无图可比")
 
     # ── R3：浸泡 ───────────────────────────────────────────────────────
     if not args.skip_soak:

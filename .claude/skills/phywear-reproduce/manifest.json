@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 17:22:38",
- "generated_at_epoch": 1789723358,
+ "generated_at": "2026-09-18 17:49:37",
+ "generated_at_epoch": 1789724977,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 216,
-  "critical": 139,
-  "bytes": 8935711,
+  "files": 219,
+  "critical": 142,
+  "bytes": 8954347,
   "missing_in_workspace": 0
  },
  "files": [
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "90c0c940d4336191530ac979387c20cb",
-   "size": 61447,
+   "md5": "184c3ededb530c68bfd9c4a67890bd8d",
+   "size": 63519,
    "present": true
   },
   {
@@ -370,8 +370,8 @@
    "dst": "apps/examples/phywear/phywear_ui.c",
    "compare": "exact",
    "critical": true,
-   "md5": "1c1904705952cd80caefab62ed7f2884",
-   "size": 53062,
+   "md5": "70c44adb0b2a207201484317ae9508f9",
+   "size": 54462,
    "present": true
   },
   {
@@ -381,8 +381,8 @@
    "dst": "apps/examples/phywear/phywear_ui.h",
    "compare": "exact",
    "critical": true,
-   "md5": "78914cdba15a63d8f3d6cad3f67a734b",
-   "size": 10197,
+   "md5": "095c603c9e2c7a375c5a681debfe6275",
+   "size": 10232,
    "present": true
   },
   {
@@ -498,12 +498,34 @@
   {
    "rule": "app",
    "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_bt.h",
+   "dst": "apps/examples/phywear/pw_bt.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "10d1f86c7308b139a702b2dba8c32c36",
+   "size": 784,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
    "snap": "app/phywear/pw_btgatt.c",
    "dst": "apps/examples/phywear/pw_btgatt.c",
    "compare": "exact",
    "critical": true,
    "md5": "63d527d44faeb1e775e07c06c1ec3fd7",
    "size": 31752,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btgatt.h",
+   "dst": "apps/examples/phywear/pw_btgatt.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "59c4418a6b0cb0a639aa8caa95767907",
+   "size": 3950,
    "present": true
   },
   {
@@ -1305,8 +1327,8 @@
    "dst": "tools/phywear/pw_accept.py",
    "compare": "exact",
    "critical": true,
-   "md5": "a06195ef4610956b40b6e65f234cd403",
-   "size": 12417,
+   "md5": "71ef3b071774d148cc99944157a93c9e",
+   "size": 12808,
    "present": true
   },
   {
@@ -1327,8 +1349,8 @@
    "dst": "tools/phywear/pw_bt_b3.py",
    "compare": "exact",
    "critical": true,
-   "md5": "041996b6bbf5dc9024498d0fe2cc4ac9",
-   "size": 16473,
+   "md5": "13d9efc0478a9c468920d0b459773c2b",
+   "size": 16797,
    "present": true
   },
   {
@@ -1371,8 +1393,8 @@
    "dst": "tools/phywear/pwshot.py",
    "compare": "exact",
    "critical": true,
-   "md5": "0f66c54337053986c6b961b1a8564bb1",
-   "size": 23256,
+   "md5": "38de0aebf9560ec993e7e950a8c60c16",
+   "size": 23636,
    "present": true
   },
   {
@@ -1384,6 +1406,17 @@
    "critical": true,
    "md5": "0937c7ebc5e792d9cc2ce51eccb2db59",
    "size": 3374,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/submit_427.sh",
+   "dst": "tools/phywear/submit_427.sh",
+   "compare": "exact",
+   "critical": true,
+   "md5": "0c27c7da14bdbe8c107a300c96dc5787",
+   "size": 9300,
    "present": true
   },
   {

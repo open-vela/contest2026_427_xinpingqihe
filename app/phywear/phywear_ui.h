@@ -229,4 +229,4 @@ bool pw_ui_demo_done(void);
 
 #endif /* __APPS_EXAMPLES_PHYWEAR_UI_H */
 
-int pw_bt_init(void);
+/* 蓝牙启动入口见 pw_bt.h（含幂等说明） */

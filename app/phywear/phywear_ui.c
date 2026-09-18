@@ -53,6 +53,7 @@
 #include "phywear_time.h"
 #include "phywear_life.h"
 #include "pw_ai.h"
+#include "pw_bt.h"
 #include "pw_btgatt.h"
 
 /****************************************************************************
@@ -1168,10 +1169,29 @@ static void btp_clear_cb(lv_event_t *e)
   g_btp_shown = lk->seq;
 }
 
+/* 只在文本真的变了才 set。
+ *
+ * 为什么较真这一下：`lv_label_set_text()` 无论内容是否相同都会让标签失效并
+ * 触发重绘。这一页是 300 ms 一跳的，不比较的话空闲时也在以 ~3 Hz 全屏重绘：
+ *   * 白耗 CPU（本项目的帧率口径很敏感）；
+ *   * 更直接的后果是**真机截图抓不稳** —— pwshot 要连续流式读上千行像素，
+ *     期间任何一次重绘都会撕掉一行，校验就判"1/1829 line(s) missing"而拒收
+ *     （我第一次截这一页就是这么失败的）。
+ * 比较一次的代价远小于一次重绘。 */
+
+static void btp_set_if_changed(lv_obj_t *lab, const char *text)
+{
+  if (strcmp(lv_label_get_text(lab), text) != 0)
+    {
+      lv_label_set_text(lab, text);
+    }
+}
+
 static void btp_tick(lv_timer_t *t)
 {
   FAR const struct pw_bt_link_s *lk = pw_bt_link();
   uint32_t n;
+  char buf[80];
   int i;
 
   (void)t;
@@ -1182,27 +1202,30 @@ static void btp_tick(lv_timer_t *t)
     }
 
   /* 状态区 */
-  lv_label_set_text(g_btp_state,
-                    lk->connected ? (lk->subscribed ? "已连接 · 已订阅"
-                                                   : "已连接")
-                                  : "未连接");
+  btp_set_if_changed(g_btp_state,
+                     lk->connected ? (lk->subscribed ? "已连接 · 已订阅"
+                                                    : "已连接")
+                                   : "未连接");
   lv_obj_set_style_text_color(g_btp_state,
                               lk->connected ? PW_COL_BT_ON : PW_COL_BT_OFF, 0);
 
   if (lk->connected)
     {
-      lv_label_set_text_fmt(g_btp_peer, "对端 %s",
-                            lk->peer[0] ? lk->peer : "(unknown)");
+      snprintf(buf, sizeof(buf), "对端 %s",
+               lk->peer[0] ? lk->peer : "(unknown)");
     }
   else
     {
       /* 未连接时把"为什么"也写清楚：这页很大一部分价值就是省掉"拿电脑看日志" */
-      lv_label_set_text(g_btp_peer, "广播中，等待手机/电脑连接");
+      snprintf(buf, sizeof(buf), "广播中，等待手机/电脑连接");
     }
 
-  lv_label_set_text_fmt(g_btp_stat, "RX %u · TX %u · echo %u · MTU %u",
-                        (unsigned)lk->rx, (unsigned)lk->tx,
-                        (unsigned)lk->echo, (unsigned)lk->mtu);
+  btp_set_if_changed(g_btp_peer, buf);
+
+  snprintf(buf, sizeof(buf), "RX %u · TX %u · echo %u · MTU %u",
+           (unsigned)lk->rx, (unsigned)lk->tx,
+           (unsigned)lk->echo, (unsigned)lk->mtu);
+  btp_set_if_changed(g_btp_stat, buf);
 
   /* 日志区：只在有新行时整体重画（seq 是单调递增的写入计数） */
   n = lk->seq;
@@ -1219,7 +1242,7 @@ static void btp_tick(lv_timer_t *t)
 
           if (idx >= n)
             {
-              lv_label_set_text(g_btp_rows[i], "");
+              btp_set_if_changed(g_btp_rows[i], "");
               continue;
             }
 
@@ -1229,7 +1252,8 @@ static void btp_tick(lv_timer_t *t)
             const char *tag = ln->dir == PW_BT_DIR_RX ? "[RX]" :
                               ln->dir == PW_BT_DIR_TX ? "[TX]" : "[--]";
 
-            lv_label_set_text_fmt(g_btp_rows[i], "%s %s", tag, ln->text);
+            snprintf(buf, sizeof(buf), "%s %s", tag, ln->text);
+            btp_set_if_changed(g_btp_rows[i], buf);
             lv_obj_set_style_text_color(g_btp_rows[i],
                           ln->dir == PW_BT_DIR_RX ? PW_COL_TEXT :
                           ln->dir == PW_BT_DIR_TX ? PW_COL_BT_ON :
@@ -1252,6 +1276,16 @@ lv_obj_t *pw_bt_screen(void)
   memset(g_btp_rows, 0, sizeof(g_btp_rows));
   g_btp_scr = scr;
   lv_obj_add_event_cb(scr, btp_del_cb, LV_EVENT_DELETE, NULL);
+
+  /* 打开这一页时确保 host 栈已起。
+   * 为什么放在这里而不是只靠 `phywear cap bt`：这一页是用户能从手表上
+   * **唯一**看到蓝牙状态的地方；若打开它却永远是"未连接"（因为栈压根没起、
+   * 也没在广播），这页就等于没用 —— 而手表上没有任何别的入口能把蓝牙打开。
+   * pw_bt_init() 是幂等的（见 pw_bt.h），已经起过就立刻返回。 */
+  if (!pw_bt_is_up())
+    {
+      pw_bt_init();
+    }
 
   /* ── 链路状态卡（390-16 宽，92 高）── */
 

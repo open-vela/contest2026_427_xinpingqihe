@@ -77,6 +77,8 @@
 #include "phywear_ui.h"
 #include "pw_btprobe.h"
 #include "pw_net.h"
+#include "pw_bt.h"
+#include "pw_btgatt.h"
 #if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
 #  include <demos/benchmark/lv_demo_benchmark.h>
 #endif
@@ -627,6 +629,13 @@ int pw_cap_open(const char *name)
 
   if (strcmp(name, "bt") == 0) { pw_bt_init(); return 1; }
   if      (strcmp(name, "root")      == 0) { pw_ui_root(); return 1; }
+  /* 取证专用：主页 + 蓝牙已启动。
+   * 为什么要单独一个名字：金标主页截图（shot root）必须保持"不依赖外部
+   * 事件"，否则一键验收会去等一个永远不会来的 BLE 连接；而"连上以后主页
+   * 那枚点是蓝的"又非证明不可。所以把"主页 + 起蓝牙 + 等链路"单独做成
+   * 一个取证入口，两边互不影响。 */
+  else if (strcmp(name, "bthome")    == 0) { if (!pw_bt_is_up()) pw_bt_init();
+                                             pw_ui_root(); return 1; }
   else if (strcmp(name, "voice")     == 0) scr = pw_voice_screen();
   else if (strncmp(name, "board", 5) == 0 && name[5] >= '0' && name[5] <= '5')
                                           { return pw_ui_open_board(name[5] - '0'); }
@@ -676,6 +685,19 @@ int pw_cap_open(const char *name)
 
   return 1;
 }
+
+/* 蓝牙页取证：等链路起来的上限（见主循环里的说明）。
+ * 宿主 pw_ble_central.py 实测 ~7 s 连上；45 s 是“够用但不至于卡死巡检”的值。 */
+#define PW_SHOT_BT_WAIT_MS  45000
+
+/* 链路起来之后还要再静默这么久才出图（见主循环里的说明）。
+ * 为什么要静默：连接/订阅/写特征会让 BT 侧往控制台打一行行日志
+ * （[bt] B3 connected / ccc changed / [bt] msg in …），
+ * 而截图是把上千行像素以文本形式从**同一个控制台**流出去的 ——
+ * 两者一交叉就会撕掉像素行，pwshot 逐行校验直接拒收整帧
+ * （实测：连接期间截 btlink 稳定报 1/1829 line(s) missing）。
+ * 宿主侧的动作几秒内就做完了，等它说完再出图即可。 */
+#define PW_SHOT_BT_QUIET_MS 4000
 
 /* 截图巡检顺序：覆盖全部主屏 / 实验页 / 工具页 / 生活页 / 设置 / 关于
  * 注意：每页打开后不再返回上级，最后一次统一回根屏即可。 */
@@ -802,6 +824,7 @@ int main(int argc, FAR char *argv[])
   int  shot_last = 0;             /* One past the last shot-plan index */
   int  shot_idx = 0;              /* Current shot-plan index */
   struct timespec shot_t0;        /* When the current page was opened */
+  static long shot_bt_conn_ms;    /* 首次看到蓝牙已连接的时刻（相对 shot_t0） */
 #ifdef CONFIG_EXAMPLES_PHYWEAR_SIM_ZH_DEMO
   bool cap_sweep = false;         /* 截图巡检：phywear capsweep [停留秒] */
   int  cap_sweep_dwell = 4;       /* 每页停留秒数（宿主机按此间隔抓帧） */
@@ -1687,6 +1710,7 @@ int main(int argc, FAR char *argv[])
      * first page is on screen. */
 
     clock_gettime(CLOCK_MONOTONIC, &shot_t0);
+    shot_bt_conn_ms = 0;
 
 #if PW_PERF_PROBE
     struct timespec perf_mark = shot_t0;
@@ -1770,28 +1794,43 @@ int main(int argc, FAR char *argv[])
              * 随 pw_bt_link() 自己变蓝。
              *
              * 因此：shot 模式截 btlink 时，最多多等
-             * PW_SHOT_BT_WAIT_MS，一旦链路起来就立刻出图（宿主侧实测
-             * ~7 s 连上）。超时也照出图（打印 WAIT-TIMEOUT），
-             * 免得把"没连上"伪装成"连上了"。 */
+             * PW_SHOT_BT_WAIT_MS；一旦看到链路起来，**再静默
+             * PW_SHOT_BT_QUIET_MS** 才出图（宿主那串订阅/读/写的控制台打印
+             * 会撕坏像素流，见宏处的说明）。超时也照出图并打印
+             * WAIT-TIMEOUT，免得把"没连上"伪装成"连上了"。 */
             if (shot_once && cap_screen != NULL &&
-                strcmp(cap_screen, "btlink") == 0 &&
-                !pw_bt_link()->connected && waited < settle + PW_SHOT_BT_WAIT_MS)
+                (strcmp(cap_screen, "btlink") == 0 ||
+                 strcmp(cap_screen, "bthome") == 0))
               {
-                if (waited >= settle && waited - settle < 1000)
+                if (!pw_bt_link()->connected)
                   {
-                    printf("[phywear] BT shot: 等链路起来 ……\n");
+                    if (waited < settle + PW_SHOT_BT_WAIT_MS)
+                      {
+                        if (waited >= settle && waited - settle < 1000)
+                          {
+                            printf("[phywear] BT shot: 等链路起来 ……\n");
+                            fflush(stdout);
+                          }
+
+                        continue;             /* 继续跑 GUI，稍后再判 */
+                      }
+
+                    printf("[phywear] BT shot: WAIT-TIMEOUT 未连上，"
+                           "按未连接状态出图\n");
                     fflush(stdout);
                   }
+                else
+                  {
+                    if (shot_bt_conn_ms == 0)
+                      {
+                        shot_bt_conn_ms = waited;
+                      }
 
-                continue;                     /* 继续跑 GUI，稍后再判 */
-              }
-
-            if (shot_once && cap_screen != NULL &&
-                strcmp(cap_screen, "btlink") == 0 &&
-                !pw_bt_link()->connected)
-              {
-                printf("[phywear] BT shot: WAIT-TIMEOUT 未连上，按未连接状态出图\n");
-                fflush(stdout);
+                    if (waited < shot_bt_conn_ms + PW_SHOT_BT_QUIET_MS)
+                      {
+                        continue;
+                      }
+                  }
               }
 
             if (waited >= settle)

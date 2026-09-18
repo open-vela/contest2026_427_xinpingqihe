@@ -202,6 +202,10 @@ def _run_central(args, sess):
 
     here = os.path.dirname(os.path.abspath(__file__))
     script = os.path.join(here, "pw_ble_central.py")
+    # 先建目录：中心设备的日志要在 dump() 之前落盘，而 dump() 才负责建目录
+    # —— 少了这一句会看到"中心设备日志留档失败: No such file or directory"，
+    # 宿主侧的 PASS 表就丢了（不影响判定，但证据缺一块）。
+    os.makedirs(args.out, exist_ok=True)
     log(f"启动宿主侧中心设备：{script}")
     pr = None
     try:

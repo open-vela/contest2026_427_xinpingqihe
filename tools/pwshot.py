@@ -40,6 +40,12 @@ PAGES = [
     "acousticgate", "applause", "settings", "btlink", "about",
 ]
 
+# 取证专用（不在巡检序列里）：bthome = 主页 + 已启动蓝牙。
+# 板子会等宿主 BLE 连上并静默几秒再出图，所以必须与 pw_ble_central.py 同时跑：
+#   (python3 tools/phywear/pw_ble_central.py --timeout 150 --text-test &) ; sleep 3
+#   PWSHOT_TOLERANCE=... python3 tools/phywear/pwshot.py shot bthome --out <dir>
+EVIDENCE_PAGES = ["bthome"]
+
 # Must match g_p2_seq[] in apps/examples/phywear/phywear.c
 P2_PAGES = [
     "20_pend_p2", "21_spring_p2", "22_centri_p2", "23_incline_p2",
