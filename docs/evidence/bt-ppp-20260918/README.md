@@ -11,6 +11,7 @@
 |---|---|
 | PPP over BLE **做了吗** | ✅ 两端代码都写了：设备侧 `apps/examples/phywear/pw_btppp.c`（BLE↔pty 字节管道 + 拉起 pppd）、宿主侧 `tools/phywear/pw_bt_ppp.py`（BLE↔PTY 桥 + 给出 pppd 命令） |
 | **跑通了吗** | ⚠️ **设备侧跑到"pty 建好 + pppd 启动"就被 SRAM 卡死**，没有走到"手表拿到 IP" |
+| 联调到哪一步 | ⚠️ **两端没联调过**：设备侧那次烧录（`device_ppp_started.log`）**宿主一次都没连上**（全程 `conn=0`），所以"主机写 `…a101` / 收 `…a102` 通知"这条链路**只做到代码级，未做端到端实测**；宿主脚本 `pw_bt_ppp.py` 只验过 `--help`/参数解析能跑。**结论按 ❌/⚠️ 记，不写成"已打通"** |
 | 卡在哪 | **SRAM**。NuttX 的 pppd 需要 ~16 KB 栈（它自己的参考例子 `apps/examples/pppd` 用 `CONFIG_EXAMPLES_PPPD_STACKSIZE=16096`），加桥任务 2 KB ≈ **18 KB**；而本板的悬崖在 **SRAM 95.98%（能开机）与 96.76%（开机挂死）之间** —— 只有约 4~5 KB 余量 |
 | 当前固件状态 | `PW_BT_PPP` **默认 0**（功能未编入），SRAM 回到 **496,452 B（94.69%）**（= 出货固件 `nuttx.bin` 2,557,296 B 那一版，构建输出实测），板子正常开机；`phywear btppp` 会打印"为什么没有" |
 
@@ -54,6 +55,11 @@
 [host-ppp] PTY 就绪：/dev/pts/N
 [host-ppp] sudo pppd /dev/pts/N 115200 noauth 192.168.7.1:192.168.7.2 local nodetach
 ```
+
+⚠️ **这段输出是"设计目标"，不是实测记录** —— 本轮只做到"脚本能被 python3 解析并打印 `--help`"，
+**没有拿它连过板子**（设备侧那次 boot 宿主全程 `conn=0`，见 `device_ppp_started.log` 末尾状态串）。
+换句话说：设备侧 GATT 字节管道**只验到"服务注册 rc=0"**，主机→设备写、设备→主机通知这两个方向
+都**没有端到端证据**。要真跑这条链路，得先解决下面的 SRAM 问题。
 
 **第二步必须 root**（pppd 要建网络接口）—— 这一步只能由人来做。
 
