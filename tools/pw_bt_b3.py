@@ -136,7 +136,8 @@ def run_selftest():
 
 def main():
     ap = argparse.ArgumentParser(
-        description=__doc__,
+        description=__doc__ + "\n\n注意：本脚本在**电脑**上运行；手机只用来点 BLE 调试 App，"
+                  "不需要在手机上跑任何脚本。",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default="",
                     help="证据落盘目录（--selftest 时不需要）")
@@ -184,6 +185,9 @@ def main():
                 "板子没在广播，别再试手机了；先看下面日志里有没有 'Unknown command: phywear'")
 
         log("=" * 68)
+        log("本脚本在**电脑**上跑；手机只需当一个蓝牙扫描/连接工具")
+        log("（手机不用装本项目的任何东西、不用跑任何脚本 —— 装个 nRF Connect /")
+        log(" LightBlue 之类的通用 BLE 调试 App 即可，商店直接搜）")
         log("现在请用手机操作（脚本正在采集）：")
         log("  1) 蓝牙扫描里按**名字**找 \"PhyWear\"（不要按 MAC）")
         log("  2) 连接")
