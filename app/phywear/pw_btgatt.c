@@ -68,7 +68,7 @@ static struct k_work_delayable g_sample_work;
 
 /* ── GATT 回调 ──────────────────────────────────────────────────────── */
 
-static void pw_sample_once(void);
+static void pw_sample_once(int strict);
 
 /* 读的时候**现采一次**：手机点一下"读"就应拿到当下这一秒的值，
  * 而不是上一轮 notify 的旧值。（采样最坏 ~150 ms，读是用户触发的，可接受。） */
@@ -78,7 +78,7 @@ static ssize_t pw_read_sensor(struct bt_conn *conn,
 {
   if (offset == 0)
     {
-      pw_sample_once();
+      pw_sample_once(1);
     }
 
   return bt_gatt_attr_read(conn, attr, buf, len, offset, &g_pkt,
@@ -172,7 +172,7 @@ static struct bt_gatt_service pw_svc = BT_GATT_SERVICE(pw_attrs);
  *  抓了出来。修好后实测 |a|≈1000 mg。） */
 #define PW_ACC_MIN_MG   300
 #define PW_ACC_MAX_MG   3000
-#define PW_ACC_TRIES    6
+#define PW_ACC_TRIES    4
 
 static int pw_imu_mag_ok(const struct pw_imu_s *imu)
 {
@@ -185,24 +185,39 @@ static int pw_imu_mag_ok(const struct pw_imu_s *imu)
          mag2 <= (long)PW_ACC_MAX_MG * PW_ACC_MAX_MG;
 }
 
-static void pw_sample_once(void)
+/* 采样一次。
+ *
+ * `strict` 决定"要不要为了拿一个好样本反复重试" —— 这一点很关键，因为
+ * **GATT 回调和周期通知都跑在 Zephyr 系统工作队列线程上**（bt_recv →
+ * k_work_submit(&hdev->rx_work) → rx_work_handler，栈 4096 B，优先级 110）。
+ * 而 pw_sensors_read_imu_oneshot() 内部最坏要走
+ * 「3 次读 + START + 5 次读」≈160 ms。如果在这里再套一层重试（原来 6 次），
+ * 最坏能把工作队列堵 ~1 秒 —— 会连带推迟 HCI 命令 TX 与所有收到的包的处理。
+ *
+ *   strict=1（GATT 读 / 自检）：用户主动触发，值得等 ⇒ 最多 PW_ACC_TRIES 次，
+ *                               拿不到合理的就报 WARN；
+ *   strict=0（500 ms 周期通知）：**只读一次**，样本不合理就**不更新** g_pkt
+ *                               （保留上一个好值），绝不为了通知去堵队列。
+ */
+static void pw_sample_once(int strict)
 {
   struct pw_imu_s imu;
   struct pw_light_s light;
+  int tries = strict ? PW_ACC_TRIES : 1;
   int i;
   int ok = 0;
 
   memset(&imu, 0, sizeof(imu));
 
-  for (i = 0; i < PW_ACC_TRIES && !ok; i++)
+  for (i = 0; i < tries && !ok; i++)
     {
       if (pw_sensors_read_imu_oneshot(&imu) == 0 && pw_imu_mag_ok(&imu))
         {
           ok = 1;
         }
-      else if (i + 1 < PW_ACC_TRIES)
+      else if (i + 1 < tries)
         {
-          usleep(25000);
+          usleep(20000);
         }
     }
 
@@ -215,9 +230,9 @@ static void pw_sample_once(void)
       g_pkt.gy = (int16_t)(imu.gy / 10);
       g_pkt.gz = (int16_t)(imu.gz / 10);
     }
-  else
+  else if (strict)
     {
-      printf("[bt] imu WARN 连续 %d 次都没有合矢量合理的样本\n", PW_ACC_TRIES);
+      printf("[bt] imu WARN %d 次都没有合矢量合理的样本\n", tries);
     }
 
   if (pw_sensors_read_light_oneshot(&light) == 0)
@@ -234,7 +249,7 @@ static void pw_sample_work_handler(struct k_work *work)
    * 有人读时会由 pw_read_sensor() 现采。 */
   if (g_nfy_on)
     {
-      pw_sample_once();
+      pw_sample_once(0);
     }
 
   if (g_nfy_on)
@@ -323,7 +338,7 @@ static int pw_btgatt_selftest(void)
     }
 
   /* ② 读路径：先采样，再走真实 read helper */
-  pw_sample_once();
+  pw_sample_once(1);
 
   {
     /* lux 单独报一次 rc：否则 g_pkt.lux==0 分不清"真的 0"还是"读失败" */
