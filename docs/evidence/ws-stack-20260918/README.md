@@ -49,10 +49,12 @@ hpwork/lpwork 上跑的东西在本固件里是明确的（`grep work_queue(HPWO
 | GUI 主页截图 sha256 | 与金标 `e356689d…` **逐字节相同** | `accept-20260918-ppp2/shot/root.png` |
 | 同口径帧率（30 s 心跳） | loops/s 196，**fps 12 不变** | `accept-20260918-ppp2/R1_fps.log` |
 | 60 s 浸泡 | 无 panic / 断言 / 重启 | `accept-20260918-ppp2/R3_soak.log` |
-| **触摸屏 worker**（同一队列） | ⚠️ **未验证** —— 自动脚本造不出真实触摸事件 | 需人工在屏上点几下确认（`ft6146_data_worker` 只做一次 ~6 B I2C 读 + `touch_event()`，8 KB 是 NuttX 默认 2 KB 的 4 倍） |
+| **触摸屏 worker**（同一队列） | ✅ **人工确认通过**（2026-09-18 深夜，用户现场在屏上点按后答复"未发现异常"，同一 boot 心跳打到 `t=240s`、无 panic/断言/复位） | `HUMAN-touch-confirm.md`（含用户粘贴的串口原文） |
 
-⇒ **如实定性**：BT 数据面这条路已经压满并验证通过；**触摸这条只做了代码级判断，没有实测**，
-列为残余风险（人工点一下即可关闭，见 `docs/07` 坑 43 的"怎么验"）。
+⇒ **如实定性**：BT 数据面用自动负载压满验证；触摸这条**只能人工**（`ft6146_irq_handler()`
+是真 IRQ 里投 `work_queue(HPWORK, …)`，脚本造不出真实触摸），已由用户现场点按确认。
+⚠️ 该确认的强度是"点按后设备继续正常运行"，**不是**栈高水位数字（本固件没开
+`CONFIG_STACK_COLORATION`，也没有 `nxsched_get_stackusage()`）—— 详见 `HUMAN-touch-confirm.md` 的"如实边界"。
 
 ## 3. 复核
 
