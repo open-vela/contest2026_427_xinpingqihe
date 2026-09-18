@@ -151,14 +151,49 @@ static struct bt_gatt_service pw_svc = BT_GATT_SERVICE(pw_attrs);
 
 /* ── 采样 + 通知 ────────────────────────────────────────────────────── */
 
-static void pw_sample_work_handler(struct k_work *work)
+/* 静止手表的三轴合矢量必然 ~1 g，用它当"这一读是不是垃圾"的判据：
+ * pw_sensors_read_imu_oneshot() 只要 accel 非全 0 就接受，而它自己的注释就写了
+ * "FIFO 刚重启时第一次常拿到全 0"，所以这里再加一道合矢量合理性检查。
+ * （2026-09-18：服务端自检第一次跑出 |a|≈15.4 g，一度以为是传感器瞬态，
+ *  实为本次重构把 IMU 读取整行删掉、读了未初始化的栈变量 —— 自检把这个自伤
+ *  抓了出来。修好后实测 |a|≈1000 mg。） */
+#define PW_ACC_MIN_MG   300
+#define PW_ACC_MAX_MG   3000
+#define PW_ACC_TRIES    6
+
+static int pw_imu_mag_ok(const struct pw_imu_s *imu)
+{
+  long ax = imu->ax;
+  long ay = imu->ay;
+  long az = imu->az;
+  long mag2 = ax * ax + ay * ay + az * az;
+
+  return mag2 >= (long)PW_ACC_MIN_MG * PW_ACC_MIN_MG &&
+         mag2 <= (long)PW_ACC_MAX_MG * PW_ACC_MAX_MG;
+}
+
+static void pw_sample_once(void)
 {
   struct pw_imu_s imu;
   struct pw_light_s light;
+  int i;
+  int ok = 0;
 
-  (void)work;
+  memset(&imu, 0, sizeof(imu));
 
-  if (pw_sensors_read_imu_oneshot(&imu) == 0)
+  for (i = 0; i < PW_ACC_TRIES && !ok; i++)
+    {
+      if (pw_sensors_read_imu_oneshot(&imu) == 0 && pw_imu_mag_ok(&imu))
+        {
+          ok = 1;
+        }
+      else if (i + 1 < PW_ACC_TRIES)
+        {
+          usleep(25000);
+        }
+    }
+
+  if (ok)
     {
       g_pkt.ax = (int16_t)imu.ax;
       g_pkt.ay = (int16_t)imu.ay;
@@ -167,11 +202,22 @@ static void pw_sample_work_handler(struct k_work *work)
       g_pkt.gy = (int16_t)(imu.gy / 10);
       g_pkt.gz = (int16_t)(imu.gz / 10);
     }
+  else
+    {
+      printf("[bt] imu WARN 连续 %d 次都没有合矢量合理的样本\n", PW_ACC_TRIES);
+    }
 
   if (pw_sensors_read_light_oneshot(&light) == 0)
     {
       g_pkt.lux = (uint16_t)(light.lux < 0 ? 0 : light.lux);
     }
+}
+
+static void pw_sample_work_handler(struct k_work *work)
+{
+  (void)work;
+
+  pw_sample_once();
 
   if (g_nfy_on)
     {
@@ -229,6 +275,95 @@ static const struct bt_data pw_sd[] =
                 0x5e, 0x4d, 0x2c, 0x1b, 0x00, 0xa0, 0xf1, 0xe0),
 };
 
+/* ── 服务端自检（B3 的可自动化部分）──────────────────────────────────
+ * B3 的"空口"那一段必须有真实 BLE 中心设备（手机/蓝牙棒）才能验，
+ * 但**服务端数据库 + 读/写回调**这一段不需要空口就能证明。
+ * 本函数把这一段全部走一遍（用的就是手机连上后会走的那几个函数）：
+ *   ① 逐条打印属性表（UUID / 权限 / read / write 回调是否存在）
+ *   ② 采样一次真传感器，再走 bt_gatt_attr_read() 把 16 B 读出来并解析
+ *   ③ 走一遍命令写回调（等价于手机往 …a002 写 "ping"）
+ * 输出前缀统一 [bt] SELFTEST，便于脚本判定。 */
+
+static int pw_btgatt_selftest(void)
+{
+  uint8_t buf[32];
+  ssize_t n;
+  size_t i;
+  int fails = 0;
+
+  printf("[bt] SELFTEST start (服务端自检，不含空口)\n");
+
+  for (i = 0; i < ARRAY_SIZE(pw_attrs); i++)
+    {
+      const struct bt_gatt_attr *a = &pw_attrs[i];
+      char u[BT_UUID_STR_LEN];
+
+      bt_uuid_to_str(a->uuid, u, sizeof(u));
+      printf("[bt] SELFTEST attr[%u] %s perm=0x%02x read=%c write=%c\n",
+             (unsigned)i, u, a->perm, a->read ? 'Y' : '-',
+             a->write ? 'Y' : '-');
+    }
+
+  /* ② 读路径：先采样，再走真实 read helper */
+  pw_sample_once();
+
+  {
+    /* lux 单独报一次 rc：否则 g_pkt.lux==0 分不清"真的 0"还是"读失败" */
+    struct pw_light_s l;
+
+    memset(&l, 0, sizeof(l));
+    int lrc = pw_sensors_read_light_oneshot(&l);
+
+    printf("[bt] SELFTEST light rc=%d lux=%d ch0=%d ch1=%d\n", lrc, l.lux,
+           l.ch0, l.ch1);
+  }
+
+  memset(buf, 0, sizeof(buf));
+  n = bt_gatt_attr_read(NULL, &pw_attrs[PW_ATTR_SENSOR_VALUE], buf,
+                        sizeof(buf), 0, &g_pkt, sizeof(g_pkt));
+  printf("[bt] SELFTEST read sensor -> %d B (want %u)\n", (int)n,
+         (unsigned)sizeof(g_pkt));
+  if (n == (ssize_t)sizeof(g_pkt))
+    {
+      int16_t ax = (int16_t)(buf[0] | (buf[1] << 8));
+      int16_t ay = (int16_t)(buf[2] | (buf[3] << 8));
+      int16_t az = (int16_t)(buf[4] | (buf[5] << 8));
+      uint16_t lux = (uint16_t)(buf[12] | (buf[13] << 8));
+      long mag = 0;
+      long t = (long)ax * ax + (long)ay * ay + (long)az * az;
+
+      while (mag * mag < t)
+        {
+          mag++;
+        }
+
+      printf("[bt] SELFTEST decode ax=%d ay=%d az=%d mg |a|=%ld mg lux=%u\n",
+             ax, ay, az, mag, (unsigned)lux);
+      if (mag < 300 || mag > 3000)
+        {
+          printf("[bt] SELFTEST FAIL 合矢量 %ld mg 不合理（静止应 ~1000 mg）\n",
+                 mag);
+          fails++;
+        }
+    }
+  else
+    {
+      fails++;
+    }
+
+  /* ③ 写路径：等价于手机往命令特征写 "ping" */
+  printf("[bt] SELFTEST write cmd \"ping\" ->\n");
+  n = pw_write_cmd(NULL, &pw_attrs[5], "ping", 4, 0, 0);
+  printf("[bt] SELFTEST write ret=%d (want 4)\n", (int)n);
+  if (n != 4 || g_cmd_count == 0)
+    {
+      fails++;
+    }
+
+  printf("[bt] SELFTEST %s (fails=%d)\n", fails == 0 ? "PASS" : "FAIL", fails);
+  return fails;
+}
+
 /* ── 对外入口 ───────────────────────────────────────────────────────── */
 
 int pw_btgatt_start(void)
@@ -282,5 +417,7 @@ int pw_btgatt_start(void)
   printf("[bt] B2   sensor e0f1a001 READ|NOTIFY (16B) / cmd e0f1a002 WRITE\n");
 
   k_work_reschedule(&g_sample_work, K_MSEC(PW_SAMPLE_MS));
+
+  pw_btgatt_selftest();
   return 0;
 }
