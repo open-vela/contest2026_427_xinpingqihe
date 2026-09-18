@@ -174,6 +174,18 @@ static struct bt_gatt_service pw_svc = BT_GATT_SERVICE(pw_attrs);
 #define PW_ACC_MAX_MG   3000
 #define PW_ACC_TRIES    4
 
+/* strict 路径（GATT 读 / 自检）的总时间预算，单位 ms。
+ * 为什么要有预算：这些回调跑在 Zephyr 系统工作队列线程上，而
+ * pw_sensors_read_imu_oneshot() **一次**最坏就 ~160 ms（内部 3 次读 + START + 5 次读）。
+ * 只按"次数"限（4 次）⇒ 最坏 ~640 ms 把 HCI 收包处理与命令 TX 全按住，
+ * 手机连着时可能表现成卡顿甚至掉线。改成按**时间**限：
+ *   - 最多 PW_ACC_TRIES 次；
+ *   - 且只有"剩余预算还够再来一次"时才重试（PW_ACC_MIN_RETRY_MS）。
+ * 拿不到就保留上一个好值（不更新 g_pkt），绝不为了一个读数把 BT 按住。
+ * 注：单次 oneshot 自身的耗时无法从外面切断，所以下界就是一次调用的量级。 */
+#define PW_SAMPLE_BUDGET_MS     200
+#define PW_ACC_MIN_RETRY_MS     100
+
 static int pw_imu_mag_ok(const struct pw_imu_s *imu)
 {
   long ax = imu->ax;
@@ -204,6 +216,7 @@ static void pw_sample_once(int strict)
   struct pw_imu_s imu;
   struct pw_light_s light;
   int tries = strict ? PW_ACC_TRIES : 1;
+  int64_t deadline = k_uptime_get() + PW_SAMPLE_BUDGET_MS;
   int i;
   int ok = 0;
 
@@ -214,11 +227,16 @@ static void pw_sample_once(int strict)
       if (pw_sensors_read_imu_oneshot(&imu) == 0 && pw_imu_mag_ok(&imu))
         {
           ok = 1;
+          break;
         }
-      else if (i + 1 < tries)
+
+      /* 还有没有"再来一次"的预算？没有就立刻收手。 */
+      if (!strict || k_uptime_get() + PW_ACC_MIN_RETRY_MS > deadline)
         {
-          usleep(20000);
+          break;
         }
+
+      usleep(20000);
     }
 
   if (ok)
@@ -337,8 +355,16 @@ static int pw_btgatt_selftest(void)
              a->write ? 'Y' : '-');
     }
 
-  /* ② 读路径：先采样，再走真实 read helper */
-  pw_sample_once(1);
+  /* ② 读路径：先采样，再走真实 read helper。
+   * 这里顺便把采样耗时**量出来**打印 —— 「预算 200 ms」不能只是注释里的一句话，
+   * 得在真机日志里有数（这个回调与周期通知都在 BT 工作队列线程上）。 */
+  {
+    int64_t t0 = k_uptime_get();
+
+    pw_sample_once(1);
+    printf("[bt] SELFTEST sample took %d ms (budget %d ms)\n",
+           (int)(k_uptime_get() - t0), PW_SAMPLE_BUDGET_MS);
+  }
 
   {
     /* lux 单独报一次 rc：否则 g_pkt.lux==0 分不清"真的 0"还是"读失败" */
