@@ -636,6 +636,12 @@ int pw_cap_open(const char *name)
    * 一个取证入口，两边互不影响。 */
   else if (strcmp(name, "bthome")    == 0) { if (!pw_bt_is_up()) pw_bt_init();
                                              pw_ui_root(); return 1; }
+  /* 取证：主页 + 等"连上 → 再断开"之后再出图。
+   * 为什么需要：用户报的现象就是"连过之后断开了，手表还显示已连接"。
+   * 要证明它现在会翻回未连接，就得**真的经历一次断开**再拍 ——
+   * 而 shot 是"开机后第一个 GUI"，没法先连一次再重启拍照。 */
+  else if (strcmp(name, "btafter")   == 0) { if (!pw_bt_is_up()) pw_bt_init();
+                                             pw_ui_root(); return 1; }
   else if (strcmp(name, "voice")     == 0) scr = pw_voice_screen();
   else if (strncmp(name, "board", 5) == 0 && name[5] >= '0' && name[5] <= '5')
                                           { return pw_ui_open_board(name[5] - '0'); }
@@ -825,6 +831,7 @@ int main(int argc, FAR char *argv[])
   int  shot_idx = 0;              /* Current shot-plan index */
   struct timespec shot_t0;        /* When the current page was opened */
   static long shot_bt_conn_ms;    /* 首次看到蓝牙已连接的时刻（相对 shot_t0） */
+  static int  shot_bt_phase;      /* btafter 用：0=等连上 1=等断开 */
 #ifdef CONFIG_EXAMPLES_PHYWEAR_SIM_ZH_DEMO
   bool cap_sweep = false;         /* 截图巡检：phywear capsweep [停留秒] */
   int  cap_sweep_dwell = 4;       /* 每页停留秒数（宿主机按此间隔抓帧） */
@@ -1711,6 +1718,7 @@ int main(int argc, FAR char *argv[])
 
     clock_gettime(CLOCK_MONOTONIC, &shot_t0);
     shot_bt_conn_ms = 0;
+    shot_bt_phase = 0;
 
 #if PW_PERF_PROBE
     struct timespec perf_mark = shot_t0;
@@ -1800,8 +1808,26 @@ int main(int argc, FAR char *argv[])
              * WAIT-TIMEOUT，免得把"没连上"伪装成"连上了"。 */
             if (shot_once && cap_screen != NULL &&
                 (strcmp(cap_screen, "btlink") == 0 ||
-                 strcmp(cap_screen, "bthome") == 0))
+                 strcmp(cap_screen, "bthome") == 0 ||
+                 strcmp(cap_screen, "btafter") == 0))
               {
+                /* btafter 的两阶段：先等连上（证明链路真建立过），
+                 * 再等断开（这才是要拍的那一刻）。 */
+                if (strcmp(cap_screen, "btafter") == 0 &&
+                    shot_bt_phase == 0 && pw_bt_link()->connected)
+                  {
+                    shot_bt_phase = 1;
+                    shot_bt_conn_ms = 0;
+                    printf("[phywear] BT shot(btafter): 已连上，等它断开 ……\n");
+                    fflush(stdout);
+                  }
+
+                if (strcmp(cap_screen, "btafter") == 0 && shot_bt_phase == 1 &&
+                    pw_bt_link()->connected)
+                  {
+                    continue;                 /* 还没断，继续等 */
+                  }
+
                 if (!pw_bt_link()->connected)
                   {
                     if (waited < settle + PW_SHOT_BT_WAIT_MS)
