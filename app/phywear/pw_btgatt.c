@@ -272,7 +272,12 @@ int pw_btgatt_start(void)
       snprintf(addr, sizeof(addr), "??");
     }
 
-  printf("[bt] B2 READY name=PhyWear addr=%s\n", addr);
+  /* 别把 identity 地址当成"广播地址"：实测 H4 原文里
+   * LE Set Extended Advertising Parameters 的 own_addr_type = 0x01(RANDOM)，
+   * 且先发了 LE Set Advertising Set Random Address —— 手机上看到的是**随机地址**，
+   * 按 MAC 找会找不到，必须按名字找。（所以这里同时打印 identity 供对照。） */
+  printf("[bt] B2 READY name=PhyWear identity=%s\n", addr);
+  printf("[bt] B2 NOTE 广播用随机地址(EXT_ADV+PRIVACY)：手机请按名字找，别按 MAC\n");
   printf("[bt] B2 svc e0f1a000-1b2c-4d5e-8f90-a1b2c3d4e5f6\n");
   printf("[bt] B2   sensor e0f1a001 READ|NOTIFY (16B) / cmd e0f1a002 WRITE\n");
 
