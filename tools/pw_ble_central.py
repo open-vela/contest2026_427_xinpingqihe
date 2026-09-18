@@ -180,6 +180,27 @@ class Central:
         log("连接或服务解析超时")
         return False
 
+    def disconnect(self, dev_path):
+        """显式断开。
+
+        为什么必须有这一步（2026-09-18 用户报的 bug）：
+          BlueZ 是中心设备，**它不会因为我们的进程退出就断开 LE 链路**。
+          早先的脚本测完直接退出，链路就一直挂着 ⇒ 手表端（外设）那边
+          `connected` 永远为真，主页一直显示"已连接"，断开很久也不变；
+          而且它还占着连接、不再广播，手机随后也连不上。
+          用户看到的就是"蓝牙早断了，手表还显示已连接"。
+          所以测完必须主动 Disconnect，把手表放回可被发现状态。
+        """
+        try:
+            dev = dbus.Interface(self.bus.get_object(BLUEZ, dev_path),
+                                 DEVICE_IFACE)
+            dev.Disconnect()
+            log("已主动断开（手表回到可被发现）")
+            return True
+        except dbus.DBusException as e:
+            log(f"断开失败：{e.get_dbus_name()}（手表可能仍显示已连接）")
+            return False
+
     def gatt(self, dev_path):
         """返回 (service_path, {uuid: chr_path})"""
         svc, chrs = None, {}
@@ -313,7 +334,7 @@ class Central:
 
 
 def run_full_test(report, name="PhyWear", timeout=30.0, notify_count=2,
-                  text_test=False):
+                  text_test=False, disconnect_at_end=True):
     """跑完整测试序列，逐项通过 `report(label, ok, detail)` 回调。
 
     **为什么要把序列抽出来**：这条序列原本内联在 main() 里，只服务命令行。
@@ -415,6 +436,11 @@ def run_full_test(report, name="PhyWear", timeout=30.0, notify_count=2,
                 check("写文本后收到设备 echo（双向连通）", False,
                       e.get_dbus_name())
 
+    # 收尾：主动断开。测完不断开的话，手表会一直显示"已连接"（而它是对的——
+    # 链路真还在），并且不再广播，手机随后也连不上。见 Central.disconnect()。
+    if disconnect_at_end:
+        check("测完主动断开（手表回到可被发现）", c.disconnect(dev))
+
     return rows, info
 
 
@@ -427,13 +453,17 @@ def main():
     ap.add_argument("--text-test", action="store_true",
                     help="额外跑文本串口（…a003）的连通性测试："
                          "写一条带时间戳的文本，等设备把 echo 原样发回来")
+    ap.add_argument("--keep-connected", action="store_true",
+                    help="测完**不**断开（默认会主动断开，否则手表一直显示"
+                         "已连接且不再广播）")
     args = ap.parse_args()
 
     rows, _info = run_full_test(
         lambda label, ok, detail: log(
             f"{'PASS' if ok else 'FAIL'}  {label}  {detail}"),
         name=args.name, timeout=args.timeout,
-        notify_count=args.notify_count, text_test=args.text_test)
+        notify_count=args.notify_count, text_test=args.text_test,
+        disconnect_at_end=not args.keep_connected)
 
     if not rows:
         return 2

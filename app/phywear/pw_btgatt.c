@@ -97,6 +97,8 @@ static struct pw_bt_link_s  g_link;
 
 /* 手表 → 手机 的文本发送队列（只放一条，连点就 -EBUSY） */
 static struct k_work       g_text_work;
+static struct k_work       g_adv_work;      /* 断线后重开广播（见下） */
+static void pw_adv_restart(struct k_work *work);
 static char                g_text_out[PW_BT_TEXT_MAX + 1];
 static uint8_t             g_text_pending;
 
@@ -568,6 +570,9 @@ static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
   g_link.peer[0] = '\0';
   g_text_pending = 0;
   pw_bt_log(PW_BT_DIR_SYS, "disconnected");
+
+  /* 让手表回到"可被发现"，否则断了就再也连不上（要复位才行） */
+  k_work_submit(&g_adv_work);
 }
 
 static struct bt_conn_cb pw_conn_cb =
@@ -796,6 +801,37 @@ static int pw_btgatt_selftest(void)
 
 /* ── 对外入口 ───────────────────────────────────────────────────────── */
 
+/* 断线后重开广播。
+ *
+ * 为什么必须显式做（2026-09-18 用户报"手表一直显示已连接"时顺带查出来的）：
+ *   本板 defconfig **没有开 `CONFIG_BT_ADV_PERSIST`**（`.config` 里 grep 计数为 0），
+ *   而 zblue/Zephyr 的 `bt_le_adv_resume()` 在没开这个符号时是**空实现** ——
+ *   也就是说：连接建起来之后一旦断开，设备**不会自己重新广播**，
+ *   必须复位板子或重跑 `phywear cap bt` 才能再被搜到。
+ *   对一个"拿来就能连"的手表来说这是硬伤（用户想重连时发现搜不到了）。
+ *
+ * 为什么用工作项而不是直接在 disconnected 回调里调 bt_le_adv_start：
+ *   回调是在连接拆除的**过程中**执行的，那里立刻重开广播容易撞上还没释放完的
+ *   广播实例；投到系统工作队列上等这一步走完再开更稳。
+ * 为什么不用 CONFIG_BT_ADV_PERSIST：那要改 defconfig + resetconfig + 重编，
+ *   而这里显式做一次还能**打一行 rc**，空口/串口上就有据可查。
+ */
+static void pw_adv_restart(struct k_work *work)
+{
+  int rc;
+
+  (void)work;
+
+  rc = bt_le_adv_start(BT_LE_ADV_CONN, pw_ad, ARRAY_SIZE(pw_ad), pw_sd,
+                       ARRAY_SIZE(pw_sd));
+  printf("[bt] adv restart rc=%d %s\n", rc, rc == 0 ? "(ok)" : "(FAILED)");
+
+  if (rc == 0)
+    {
+      pw_bt_log(PW_BT_DIR_SYS, "advertising again");
+    }
+}
+
 int pw_btgatt_start(void)
 {
   bt_addr_le_t addrs[1];
@@ -807,6 +843,7 @@ int pw_btgatt_start(void)
   memset(&g_link, 0, sizeof(g_link));
   pw_bt_log_reset();
   k_work_init(&g_text_work, pw_text_work_handler);
+  k_work_init(&g_adv_work, pw_adv_restart);
 
   rc = bt_gatt_service_register(&pw_svc);
   printf("[bt] B2 gatt register rc=%d %s\n", rc, rc == 0 ? "(ok)" : "(FAILED)");

@@ -166,6 +166,15 @@ class App:
                        font=self.f_small, bg=COL_BG,
                        activebackground=COL_BG).pack(side="left", padx=12)
 
+        # 默认测完断开。为什么要有这个开关而不是写死：
+        # 不断开时手表会一直显示"已连接"且不再广播 —— 那正是用户报的
+        # "蓝牙断了很久还显示已连接"的根因之一。但要连续观察手表端状态时
+        # 又确实想保持连接，所以给一个显式勾选。
+        self.var_keep = tk.IntVar(value=0)
+        tk.Checkbutton(bar, text="测完保持连接", variable=self.var_keep,
+                       font=self.f_small, bg=COL_BG,
+                       activebackground=COL_BG).pack(side="left", padx=4)
+
         self.lbl_state = tk.Label(bar, text="待测试", font=self.f_body,
                                   bg=COL_BG, fg=COL_DIM)
         self.lbl_state.pack(side="right")
@@ -244,6 +253,7 @@ class App:
             self.timeout = 20.0
 
         self.text_test = bool(self.var_text.get())
+        self.keep_connected = bool(self.var_keep.get())
         self.stop_flag = False
         self.busy = True
         self.t0 = time.time()
@@ -270,7 +280,8 @@ class App:
             rows, info = C.run_full_test(
                 lambda label, ok, detail: self.q.put(("row", label, ok, detail)),
                 name="PhyWear", timeout=self.timeout,
-                notify_count=2, text_test=self.text_test)
+                notify_count=2, text_test=self.text_test,
+                disconnect_at_end=not self.keep_connected)
         except Exception as e:                      # noqa: BLE001
             err = f"{type(e).__name__}: {e}"
         self.q.put(("done", err, {"rows": rows, "info": info,
