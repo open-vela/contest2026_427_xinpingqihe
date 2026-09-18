@@ -93,8 +93,25 @@ def main():
     try:
         if not args.no_reset:
             sess.reset()
-        sess.send("phywear cap bt", wait=False)
-        sess.pump(12.0)
+
+        # ⚠️ 必须先确认命令**真的生效**再让用户去手机上找设备。
+        # 本板控制台被 NSH 与 ai_agent 的 vela> CLI **抢同一个 stdin**：
+        # 谁先阻塞在 read 谁拿到那一行。实测约一半的概率 phywear 会被 vela> 吃掉，
+        # 回一句 "Unknown command: phywear"，于是根本没有广播 ——
+        # 如果不检查就提示用户"去连 PhyWear"，人会白折腾一轮还以为设备坏了。
+        started = False
+        for attempt in range(1, 6):
+            sess.send("phywear cap bt", wait=False)
+            sess.pump(12.0)
+            if b"[bt] B2 adv start rc=0" in bytes(sess.raw):
+                log(f"命令已生效（第 {attempt} 次尝试）")
+                started = True
+                break
+            log(f"第 {attempt} 次没生效（多半被 vela> CLI 吃了），重试……")
+
+        if not started:
+            log("致命：连续 5 次都没能让 `phywear cap bt` 生效 —— "
+                "板子没在广播，别再试手机了；先看下面日志里有没有 'Unknown command: phywear'")
 
         log("=" * 68)
         log("现在请用手机操作（脚本正在采集）：")
