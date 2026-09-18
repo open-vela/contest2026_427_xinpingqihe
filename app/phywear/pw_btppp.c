@@ -48,6 +48,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include <zephyr/kernel.h>
@@ -58,21 +59,24 @@
 #include "netutils/pppd.h"
 #include "pw_btppp.h"
 
-/* ── 总开关：默认 **关**（2026-09-18 实测结论，见 docs/16 §13.6e）────────
+/* ── 总开关：2026-09-18 起 **默认开** ──────────────────────────────────
  *
- * 功能本身已经跑通到"pty 建好 + pppd 起来"（串口原文见证据目录），
- * 但**装不进这块板子**：
- *   · NuttX 的 pppd 需要 ~16 KB 栈（它自己的参考例子
- *     apps/examples/pppd 用 CONFIG_EXAMPLES_PPPD_STACKSIZE=16096）；
- *   · 加上桥任务的 2 KB，本功能要 ~18 KB SRAM；
- *   · 实测本板的悬崖在 **95.98%（能开机）与 96.76%（开机挂死在 SFBL/ABCD 之前）之间**
- *     —— 也就是只有约 4~5 KB 余量。把 pppd 栈给到 16 KB 时 SRAM 到 98.71%，
- *     板子连 ABCD 都打不出来（只有 SFBL）。
- * 所以默认关掉，保住出货固件可开机；等 SRAM 腾出 ~18 KB 再打开这个宏即可
- * （代码、GATT 服务、宿主脚本都已就位）。
+ * 2026-09-18 的状态是"功能跑通到 pty + pppd 启动，但装不进 SRAM"：
+ *   · NuttX 的 pppd 需要 ~16 KB 栈（参考例子 apps/examples/pppd 用
+ *     CONFIG_EXAMPLES_PPPD_STACKSIZE=16096）；
+ *   · 加上桥任务 2 KB + pty 2×512 B，本功能要 ~21 KB SRAM；
+ *   · 当时余量只有 ~4~5 KB（悬崖在 95.98% 能开机 / 96.76% 挂死之间），
+ *     给 pppd 16 KB 时 SRAM 98.71%，板子连 ABCD 都打不出来。
+ *
+ * 2026-09-18 把 NuttX 的 hpwork/lpwork 栈由 16096 B 收到 **8192 B**
+ * （defconfig 里 CONFIG_SCHED_HPWORKSTACKSIZE/CONFIG_SCHED_LPWORKSTACKSIZE；
+ * 两者只是继承了板级 DEFAULT_TASK_STACKSIZE=16096，本身没有特殊需求）：
+ *   SRAM 496,452 B (94.69%) → 480,644 B (91.68%)，净腾出 **15,808 B**。
+ * 腾出的空间足够本功能按"设计值"跑（pppd 16 KB + 桥 2 KB）。
+ * 8 KB 栈的安全性由真机完整负载验证（验收 18/18 + B3 文本往返 + GUI）。
  */
 #ifndef PW_BT_PPP
-#define PW_BT_PPP 0
+#define PW_BT_PPP 1
 #endif
 
 #if PW_BT_PPP
@@ -93,8 +97,17 @@ static volatile uint8_t  g_ppp_sub;      /* 主机是否订阅了 TX 通知 */
 static volatile uint8_t  g_ppp_up;       /* 管道是否已起来 */
 
 static int  g_pty_master = -1;
+static int  g_pty_slave_fd = -1;   /* 常开：见 pw_ppp_bridge_task 里的说明 */
 static char g_pty_slave[32];
 static volatile int g_pppd_rc = -1;      /* pppd 退出码（正常时永远不返回） */
+
+/* 排障计数（2026-09-18 加的）：把"卡在哪一段"直接暴露在状态串里。
+ *   g_dbg_tx_pty = 主机→设备方向、真正写进 pty 的字节数
+ *   g_dbg_rx_pty = 设备→主机方向、从 pty 读出来的字节数
+ *   g_trace      = 前若干条明细日志的配额（避免 ping 时刷屏） */
+static volatile uint32_t g_dbg_tx_pty;
+static volatile uint32_t g_dbg_rx_pty;
+static volatile int      g_trace;
 
 /* pppd 参数。两点注意：
  * ① `ttyname` 在 struct 里是**字符数组**（`char ttyname[TTYNAMSIZ]`），
@@ -176,14 +189,16 @@ static ssize_t pw_ppp_status_read(struct bt_conn *conn,
                                   const struct bt_gatt_attr *attr, void *buf,
                                   uint16_t len, uint16_t offset)
 {
-  char st[96];
+  char st[192];
   int n;
 
   n = snprintf(st, sizeof(st),
-               "PhyWear ppp up=%u sub=%u slave=%s rx=%u tx=%u drop=%u pppd=%d",
+               "PhyWear ppp up=%u sub=%u slave=%s rx=%u tx=%u drop=%u "
+               "ptx=%lu prx=%lu pppd=%d",
                (unsigned)g_ppp_up, (unsigned)g_ppp_sub, g_pty_slave,
                (unsigned)g_rx_total, (unsigned)g_tx_total,
-               (unsigned)g_rx_drop, g_pppd_rc);
+               (unsigned)g_rx_drop, (unsigned long)g_dbg_tx_pty,
+               (unsigned long)g_dbg_rx_pty, g_pppd_rc);
 
   return bt_gatt_attr_read(conn, attr, buf, len, offset, st, (uint16_t)n);
 }
@@ -206,7 +221,16 @@ static struct bt_gatt_attr pw_ppp_attrs[] =
   BT_GATT_CCC(pw_ppp_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 };
 
-#define PW_PPP_ATTR_TX 2
+/* 属性索引必须**数清楚**（BT_GATT_CHARACTERISTIC 会展开成两条：
+ * 特征声明 + 特征值）：
+ *   [0] 主服务
+ *   [1] rx 声明   [2] rx 值        （主机写进来的 PPP 字节）
+ *   [3] tx 声明   [4] tx 值        ← 通知要发给**这一条**
+ *                 [5] tx 的 CCC
+ * 2026-09-18 实测教训：最初写的是 2（= rx 值），而 rx 特征只有 WRITE、
+ * 没有 NOTIFY ⇒ `bt_gatt_notify()` 每次回 -22 = -EINVAL，设备侧看着
+ * "读到了 17/32 B 但发不出去"，宿主一个字节都收不到。 */
+#define PW_PPP_ATTR_TX 4
 
 static struct bt_gatt_service pw_ppp_svc = BT_GATT_SERVICE(pw_ppp_attrs);
 
@@ -225,13 +249,84 @@ static void pw_ppp_pppd_task(void *a, void *b, void *c)
   printf("[ppp] pppd returned %d (0 才是正常退出)\n", g_pppd_rc);
 }
 
-K_THREAD_STACK_DEFINE(g_pppd_stack, 16384);   /* 与 apps/examples/pppd 的 CONFIG_EXAMPLES_PPPD_STACKSIZE 一致 */
+/* 两个任务的栈都从**堆**上要（本板堆在 PSRAM，空闲 7.3 MB），不再用
+ * K_THREAD_STACK_DEFINE 静态占 SRAM。
+ *
+ * 为什么改：静态栈是**无条件**占 SRAM 的，而 SRAM 只有 512 KB、本固件已
+ * 95%+（实测悬崖在 96~97% 之间）。放堆上以后，"平时不跑 PPP"就不付这份钱；
+ * 而且 2048 B 的桥栈**明显不够**（2026-09-18 实测：桥任务在第一次
+ * write(pty) 之后整机静默、tx 计数一直为 0 —— 和当初 1 KB 栈那次同型）。
+ * 对齐 32 B：pthread_attr_setstack() 对栈指针有对齐要求。 */
+#ifndef PW_PPP_BRIDGE_STACK
+#define PW_PPP_BRIDGE_STACK 8192
+#endif
+#ifndef PW_PPP_PPPD_STACK
+#define PW_PPP_PPPD_STACK 16384   /* 与 apps/examples/pppd 的 16096 同量级 */
+#endif
+
+static void *g_pppd_stack;
 static struct k_thread g_pppd_thread;
 
 /* ── 管道任务：pty master 与环形缓冲/通知之间的搬运工 ───────────────── */
 
-K_THREAD_STACK_DEFINE(g_bridge_stack, 2048);
+static void *g_bridge_stack;
 static struct k_thread g_bridge_thread;
+
+/* 任务优先级 —— 注意本端口的 K_PRIO_PREEMPT 是**反的**：
+ *   port/include/zephyr/kernel.h: K_PRIO_PREEMPT(x) = CONFIG_NUM_COOP_PRIORITIES + x
+ * 而 NuttX 里「数值越大越紧急」，于是 x 越大反而越紧急（与 Zephyr 语义相反）。
+ * 桥任务必须**没有** pppd 紧急，否则它那个搬运循环会把 pppd 饿死：
+ * 2026-09-18 实测，桥 109 / pppd 108 ⇒ pppd 一行日志都没跑出来
+ * （ppp0 也没建），而桥在 slave 未打开时 poll 立刻返回 HUP，转成死循环。
+ * 这里把桥压到 pppd 之下，循环里再有 usleep 兜底。 */
+#define PW_PPP_PPPD_PRIO    K_PRIO_PREEMPT(8)    /* 108 */
+#define PW_PPP_BRIDGE_PRIO  K_PRIO_PREEMPT(6)    /* 106 < 108，让 pppd 先跑 */
+
+static void *pw_ppp_alloc_stack(size_t size)
+{
+  uintptr_t p = (uintptr_t)malloc(size + 32);
+
+  if (p == 0)
+    {
+      return NULL;
+    }
+
+  return (void *)((p + 31u) & ~(uintptr_t)31u);
+}
+
+/* 把 pty 变成**透明字节管道**。
+ *
+ * NuttX 的 pty 默认是"终端"语义（drivers/serial/pty.c:1079 附近初始化）：
+ *   master: pd_oflag = OPOST | OCRNL
+ *   slave : pd_oflag = OPOST | ONLCR, pd_lflag = ECHO | ICANON
+ * PPP 在这种终端上根本走不通：
+ *   · slave 的 ICANON 会把 master 写进去的数据**按行缓存**，而 HDLC 帧里
+ *     没有换行符 ⇒ pppd 永远读不到我们发的帧；
+ *   · ECHO 会把主机写进去的帧**回显**回主机（对端看到自己的帧）；
+ *   · OPOST/ONLCR 把 0x0A 变成 0x0D 0x0A，直接破坏 PPP 的 FCS。
+ * 所以 master 与 slave 两侧都要设成 raw。 */
+static void pw_ppp_set_raw(int fd)
+{
+  struct termios tio;
+
+  if (tcgetattr(fd, &tio) < 0)
+    {
+      printf("[ppp] tcgetattr(fd=%d) FAILED errno=%d\n", fd, errno);
+      return;
+    }
+
+  tio.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR |
+                   ICRNL | IXON | IXOFF);
+  tio.c_oflag &= ~OPOST;
+  tio.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+  tio.c_cflag &= ~(CSIZE | PARENB);
+  tio.c_cflag |= CS8;
+
+  if (tcsetattr(fd, TCSANOW, &tio) < 0)
+    {
+      printf("[ppp] tcsetattr(fd=%d) FAILED errno=%d\n", fd, errno);
+    }
+}
 
 static void pw_ppp_bridge_task(void *a, void *b, void *c)
 {
@@ -245,8 +340,8 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
   /* 第一行就打"我起来了"：上一版桥任务栈只有 1 KB，而下面 buf[] 就 512 B，
    * 直接栈溢出**整机静默**（没有 panic、没有 assert，串口就停了）——
    * 有这么一行"活着"的标志，下次一眼能分辨"任务没起来"还是"起来后崩了"。 */
-  printf("[ppp] bridge task up (stack %u B)\n",
-         (unsigned)K_THREAD_STACK_SIZEOF(g_bridge_stack));
+  printf("[ppp] bridge task up (stack %u B, from heap)\n",
+         (unsigned)PW_PPP_BRIDGE_STACK);
 
   /* 1) 建 pty。master 归我们，slave 名字交给 pppd 去 open。
    *    NuttX 没实现 grantpt()（include/stdlib.h 里明确写了），跳过它。 */
@@ -278,11 +373,84 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
 
   printf("[ppp] pty master fd=%d slave=%s\n", g_pty_master, g_pty_slave);
 
-  /* 2) pppd 自己的任务（阻塞式无限循环）。名字先填好再建任务。 */
-  k_thread_create(&g_pppd_thread, g_pppd_stack,
-                  K_THREAD_STACK_SIZEOF(g_pppd_stack),
+  /* 1a) 两侧都设 raw（理由见 pw_ppp_set_raw 的注释）。
+   *     slave 由我们先 open 一次设好 termios 再关掉 —— termios 存在 devpair
+   *     里，pppd 之后自己 open 时仍是 raw。 */
+  pw_ppp_set_raw(g_pty_master);
+  g_pty_slave_fd = open(g_pty_slave, O_RDWR | O_NOCTTY);
+  if (g_pty_slave_fd < 0)
+    {
+      printf("[ppp] 打不开 slave %s errno=%d\n", g_pty_slave, errno);
+    }
+  else
+    {
+      pw_ppp_set_raw(g_pty_slave_fd);
+      printf("[ppp] pty 已设 raw（master+slave 两侧）slave fd=%d\n",
+             g_pty_slave_fd);
+
+      /* 这个 slave fd **一直开着不关**。两点原因：
+       *  ① pty 的 master 在「对端没有开着的 slave」时，write() 直接回
+       *     EPIPE（实测 errno=32）—— pppd 起来之前我们写的每一帧都会失败；
+       *  ② 我们只是**持着它**，从不 read()，所以不会跟 pppd 抢数据
+       *     （NuttX 的 pty 是 devpair 内部一条管道，谁 read 谁消费）。 */
+    }
+
+  /* 打 pppd 之前先把两个 open 都试一遍并打印 errno：pppd() 失败只回一个
+   * 光秃秃的 2（tun 或 tty 打不开都回 2），不打这两行就没法判断卡在哪。 */
+  {
+    int tfd = open("/dev/tun", O_RDWR);
+
+    printf("[ppp] probe open(/dev/tun) => %d errno=%d\n",
+           tfd, tfd < 0 ? errno : 0);
+    if (tfd >= 0)
+      {
+        close(tfd);
+      }
+  }
+
+  /* 1b) 等主机订阅再拉 pppd。
+   *
+   * 为什么必须等：pppd 一起来就会往 pty 里灌 LCP Configure-Request，而本桥
+   * 在**没人订阅**时是直接丢的（PPP 会重传，堆着没意义）。NuttX pppd 的
+   * LCP 是 5 s 一次、共 5 次（ppp_conf.h: LCP_TIMEOUT/LCP_RETRY_COUNT），
+   * 也就是说主机若在 ~25 s 内没连上并订阅，设备侧 LCP 就进 LCP_TX_TIMEOUT
+   * 不再发请求 —— 那之后再连也没用了。所以顺序反过来：**先等订阅，再拉
+   * pppd**，把这段竞态从"要抢时间"变成"不可能发生"。
+   *
+   * 等待期间每 2 s 打一行，方便取证时确认"到底卡在哪一步"。
+   * 超时（180 s）也照样往下走：万一主机就是想手动试，不该被设备卡住。 */
+  {
+    int waited = 0;
+
+    while (!g_ppp_sub && waited < 180)
+      {
+        if ((waited % 10) == 0)
+          {
+            printf("[ppp] 等主机订阅 …a102（已等 %d s；主机侧跑 "
+                   "pw_bt_ppp.py --peer 或 pw_bt_ppp.py）\n", waited);
+          }
+
+        usleep(1000000);
+        waited++;
+      }
+
+    printf("[ppp] 主机订阅状态 sub=%d（等了 %d s）→ 拉起 pppd\n",
+           (int)g_ppp_sub, waited);
+  }
+
+  /* 2) pppd 自己的任务（阻塞式无限循环）。名字先填好再建任务。
+   *    栈从堆上要（见 pw_ppp_alloc_stack 的注释）。 */
+  g_pppd_stack = pw_ppp_alloc_stack(PW_PPP_PPPD_STACK);
+  if (g_pppd_stack == NULL)
+    {
+      printf("[ppp] pppd 栈 malloc(%d) 失败 errno=%d\n",
+             PW_PPP_PPPD_STACK, errno);
+      return;
+    }
+
+  k_thread_create(&g_pppd_thread, g_pppd_stack, PW_PPP_PPPD_STACK,
                   pw_ppp_pppd_task, NULL, NULL, NULL,
-                  K_PRIO_PREEMPT(8), 0, K_NO_WAIT);
+                  PW_PPP_PPPD_PRIO, 0, K_NO_WAIT);
   k_thread_name_set(&g_pppd_thread, "pw_pppd");
 
   g_ppp_up = 1;
@@ -310,11 +478,26 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
           w = write(g_pty_master, buf, n);
           if (w <= 0)
             {
+              if (g_trace < 20)
+                {
+                  printf("[ppp] pty write FAILED n=%u rc=%d errno=%d\n",
+                         n, (int)w, errno);
+                  g_trace++;
+                }
+
               break;                    /* 写不进去就下一轮再试，别丢 */
             }
 
           g_rx_tail = (g_rx_tail + (unsigned)w) % PPP_RX_RING;
           progress = 1;
+          g_dbg_tx_pty += (uint32_t)w;
+
+          if (g_trace < 20)
+            {
+              printf("[ppp] pty write n=%u rc=%d（累计 %lu B）\n",
+                     n, (int)w, (unsigned long)g_dbg_tx_pty);
+              g_trace++;
+            }
         }
 
       /* 3b) 设备 → 主机：pty 有数据就通知出去 */
@@ -325,6 +508,17 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
 
           if (r > 0)
             {
+              progress = 1;
+              g_dbg_rx_pty += (uint32_t)r;
+
+              if (g_trace < 40)
+                {
+                  printf("[ppp] pty read r=%d sub=%u（累计 %lu B）\n",
+                         (int)r, (unsigned)g_ppp_sub,
+                         (unsigned long)g_dbg_rx_pty);
+                  g_trace++;
+                }
+
               if (g_ppp_sub)
                 {
                   ssize_t sent = 0;
@@ -332,15 +526,23 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
                   while (sent < r)
                     {
                       size_t chunk = (size_t)(r - sent);
+                      int nrc;
 
                       if (chunk > PPP_TX_CHUNK)
                         {
                           chunk = PPP_TX_CHUNK;
                         }
 
-                      if (bt_gatt_notify(NULL, &pw_ppp_attrs[PW_PPP_ATTR_TX],
-                                         buf + sent, chunk) < 0)
+                      nrc = bt_gatt_notify(NULL, &pw_ppp_attrs[PW_PPP_ATTR_TX],
+                                           buf + sent, chunk);
+                      if (nrc < 0)
                         {
+                          if (g_trace < 60)
+                            {
+                              printf("[ppp] notify FAILED rc=%d\n", nrc);
+                              g_trace++;
+                            }
+
                           break;
                         }
 
@@ -355,6 +557,14 @@ static void pw_ppp_bridge_task(void *a, void *b, void *c)
                   g_rx_drop += 0;
                 }
             }
+        }
+
+      /* 空转必须**让出 CPU**：pty 的 slave 还没被 pppd 打开时，poll() 会因为
+       * HUP 立刻返回（不阻塞），这个 for(;;) 就变成满速死循环 —— 实测会把
+       * 优先级更低的 pppd 饿死到一行都跑不出来。这里兜底 sleep 2 ms。 */
+      if (!progress)
+        {
+          usleep(2000);
         }
     }
 }
@@ -379,13 +589,41 @@ int pw_btppp_start(void)
       return rc;
     }
 
-  k_thread_create(&g_bridge_thread, g_bridge_stack,
-                  K_THREAD_STACK_SIZEOF(g_bridge_stack),
+  g_bridge_stack = pw_ppp_alloc_stack(PW_PPP_BRIDGE_STACK);
+  if (g_bridge_stack == NULL)
+    {
+      printf("[ppp] 桥栈 malloc(%d) 失败 errno=%d\n",
+             PW_PPP_BRIDGE_STACK, errno);
+      return -ENOMEM;
+    }
+
+  k_thread_create(&g_bridge_thread, g_bridge_stack, PW_PPP_BRIDGE_STACK,
                   pw_ppp_bridge_task, NULL, NULL, NULL,
-                  K_PRIO_PREEMPT(9), 0, K_NO_WAIT);
+                  PW_PPP_BRIDGE_PRIO, 0, K_NO_WAIT);
   k_thread_name_set(&g_bridge_thread, "pw_btppp");
 
-  return 0;
+  /* ── 必须留在这个 task_group 里：本函数**不能返回** ──────────────────
+   *
+   * zblue 的 `k_thread_create()` 是 `pthread_create()`（port/kernel/thread.c），
+   * 所以桥线程与 pppd 线程都挂**当前 task_group** 下；而 NuttX 的 fd 表也是
+   * 按 group 走的（`nxsched_get_fdlist()` → `&group->tg_fdlist`）。
+   * `phywear` 主任务一旦从 main() 返回，整个 group 就被销毁 —— 桥与 pppd
+   * 两个 pthread 随之消失。表现就是：pty 建好、pppd 打印完
+   * "starting pppd" 之后串口**再无任何输出**。
+   *
+   * 2026-09-18 那一轮我把它归因成"pppd 栈不足→硬故障"，是**没有对照的猜测**
+   * （当时 main 直接 return 0）。现在改成不返回，用来判定是不是这个原因。
+   *
+   * 代价：本命令会一直占着调用它的任务，所以要用**后台**方式跑：
+   *     phywear btppp &
+   * NSH 打印 PID 后立刻回到提示符，`ifconfig` / `ping` 继续可用。 */
+  printf("[ppp] 提示：本命令不会返回（PPP 要长期挂着跑），请用 "
+         "'phywear btppp &' 后台运行\n");
+
+  for (; ; )
+    {
+      usleep(1000000);
+    }
 }
 
 #else  /* !PW_BT_PPP */

@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 22:11:30",
- "generated_at_epoch": 1789740690,
+ "generated_at": "2026-09-18 22:50:33",
+ "generated_at_epoch": 1789743033,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 226,
   "critical": 149,
-  "bytes": 9028812,
+  "bytes": 9055195,
   "missing_in_workspace": 0
  },
  "files": [
@@ -535,8 +535,8 @@
    "dst": "apps/examples/phywear/pw_btppp.c",
    "compare": "exact",
    "critical": true,
-   "md5": "d57d63b4c0a3bae48943314d1675d219",
-   "size": 15326,
+   "md5": "292ba54d4f22889f08e29edd0aa7bd55",
+   "size": 25419,
    "present": true
   },
   {
@@ -1382,8 +1382,8 @@
    "dst": "tools/phywear/pw_ble_central.py",
    "compare": "exact",
    "critical": true,
-   "md5": "6698fb0c7ee2e35b8e58ff2cbedb20e3",
-   "size": 25430,
+   "md5": "be04c8697afc34161430009356830635",
+   "size": 26467,
    "present": true
   },
   {
@@ -1415,8 +1415,8 @@
    "dst": "tools/phywear/pw_bt_ppp.py",
    "compare": "exact",
    "critical": true,
-   "md5": "8cf7ddc45f35bccb421b17585eb9e2e0",
-   "size": 6293,
+   "md5": "2e35ba31a0b37880a1f4dea6d8f22925",
+   "size": 21481,
    "present": true
   },
   {
@@ -1591,8 +1591,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "9cc3b07efcb9899d344485368e815bbd",
-   "size": 10747,
+   "md5": "5ce1edaaf6f98bf2e901b7b7c0955cec",
+   "size": 10812,
    "present": true
   },
   {

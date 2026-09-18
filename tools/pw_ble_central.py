@@ -221,6 +221,26 @@ class Central:
                     chrs[norm(ifaces[GATT_CHR_IFACE]["UUID"])] = path
         return svc, chrs
 
+    def gatt_all(self, dev_path):
+        """返回本设备**所有服务**下的特征 {uuid: chr_path}（跨服务）。
+
+        为什么需要单独一个方法：`gatt()` 只收**主传感器服务**（SVC_UUID）下的
+        特征 —— B2/B3 的断言都是针对那一组句柄写的，不能动。但 PPP over BLE
+        用的是**第二个服务**（…a1xx），属于别的 GATT service 路径，用 `gatt()`
+        永远找不到（2026-09-18 实测：脚本报"没找到 PPP 特征"，其实是过滤掉的）。
+        """
+        objs = self.om.GetManagedObjects()
+        chrs = {}
+        for path, ifaces in objs.items():
+            if GATT_CHR_IFACE not in ifaces:
+                continue
+            svc_path = str(ifaces[GATT_CHR_IFACE].get("Service", ""))
+            svc_iface = objs.get(svc_path, {}).get(GATT_SVC_IFACE, {})
+            if str(svc_iface.get("Device", "")) != str(dev_path):
+                continue
+            chrs[norm(ifaces[GATT_CHR_IFACE]["UUID"])] = path
+        return chrs
+
     def read(self, chr_path):
         iface = dbus.Interface(self.bus.get_object(BLUEZ, chr_path),
                                GATT_CHR_IFACE)
