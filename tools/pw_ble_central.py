@@ -41,6 +41,7 @@ OM_IFACE = "org.freedesktop.DBus.ObjectManager"
 SVC_UUID = "e0f1a000-1b2c-4d5e-8f90-a1b2c3d4e5f6"
 SENSOR_UUID = "e0f1a001-1b2c-4d5e-8f90-a1b2c3d4e5f6"
 CMD_UUID = "e0f1a002-1b2c-4d5e-8f90-a1b2c3d4e5f6"
+TEXT_UUID = "e0f1a003-1b2c-4d5e-8f90-a1b2c3d4e5f6"
 
 
 def log(m):
@@ -246,6 +247,70 @@ class Central:
                                         path=chr_path)
         return got
 
+    def text_roundtrip(self, chr_path, timeout):
+        """文本特征（…a003）的双向连通性测试 —— 这就是"蓝牙串口"的判据。
+
+        做的是：订阅 → 写一条带时间戳的文本 → **等设备把它原样 echo 回来**。
+        为什么用"echo 回来"当判据而不是"写成功"：BlueZ 的 WriteValue 返回成功
+        只说明本地协议栈把包发出去了，空口上丢没丢、设备侧收没收到、
+        设备能不能主动发回来，它一概不知道。收到 echo 才证明
+        「手机→手表」和「手表→手机」**两个方向**都通。
+        """
+        got = []
+        iface = dbus.Interface(self.bus.get_object(BLUEZ, chr_path),
+                               GATT_CHR_IFACE)
+
+        def on_props(interface, changed, invalidated):
+            if interface != GATT_CHR_IFACE:
+                return
+            if "Value" in changed:
+                got.append(bytes(bytearray(changed["Value"])))
+
+        self.bus.add_signal_receiver(
+            on_props, dbus_interface=PROPS_IFACE,
+            signal_name="PropertiesChanged", path=chr_path)
+
+        iface.StartNotify()
+
+        ctx = GLib.MainContext.default()
+        # 先把订阅本身的 CCC 写下去（StartNotify 会自动写 CCC），给它一点时间
+        t0 = time.time()
+        while time.time() - t0 < 1.0:
+            while ctx.pending():
+                ctx.iteration(False)
+            time.sleep(0.1)
+
+        msg = "hello-%d" % int(time.time())
+        try:
+            self.write(chr_path, msg.encode("utf-8"))
+        except dbus.DBusException as e:
+            iface.StopNotify()
+            return msg, None, got, e.get_dbus_name()
+
+        want = ("echo: " + msg).encode("utf-8")
+        echo = None
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            while ctx.pending():
+                ctx.iteration(False)
+            for pkt in got:
+                if pkt.startswith(b"echo: "):
+                    echo = pkt
+                    break
+            if echo is not None:
+                break
+            time.sleep(0.1)
+
+        try:
+            iface.StopNotify()
+        except dbus.DBusException:
+            pass
+        self.bus.remove_signal_receiver(on_props,
+                                        dbus_interface=PROPS_IFACE,
+                                        signal_name="PropertiesChanged",
+                                        path=chr_path)
+        return msg, want, got, (None if echo is not None else "no echo")
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
@@ -253,6 +318,9 @@ def main():
     ap.add_argument("--name", default="PhyWear")
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--notify-count", type=int, default=2)
+    ap.add_argument("--text-test", action="store_true",
+                    help="额外跑文本串口（…a003）的连通性测试："
+                         "写一条带时间戳的文本，等设备把 echo 原样发回来")
     args = ap.parse_args()
 
     rows = []
@@ -307,6 +375,34 @@ def main():
         check("写 …a002 'ping' 成功", True)
     except dbus.DBusException as e:
         check("写 …a002 'ping' 成功", False, e.get_dbus_name())
+
+    # ── 文本串口（…a003）：手表版蓝牙串口的连通性测试 ──
+    if args.text_test:
+        text = chrs.get(TEXT_UUID)
+        check("找到 text 特征 …a003", text is not None)
+
+        if text:
+            try:
+                st = c.read(text).decode("utf-8", "replace")
+                check("读 …a003 得到状态串", st.startswith("PhyWear bt conn=1"),
+                      st)
+            except dbus.DBusException as e:
+                check("读 …a003 得到状态串", False, e.get_dbus_name())
+
+            try:
+                msg, want, got, err = c.text_roundtrip(text, args.timeout)
+                got_s = [p.decode("utf-8", "replace") for p in got]
+                check("写文本后收到设备 echo（双向连通）", err is None,
+                      f"写 '{msg}' → 收到 {got_s}")
+
+                # 顺带验证手表**主动**发的那条也走同一条特征
+                #（"发送测试"按钮走的就是 pw_bt_send_text → notify）
+                if err is None and got:
+                    check("echo 内容与所写一致",
+                          want in got, want.decode("utf-8", "replace"))
+            except dbus.DBusException as e:
+                check("写文本后收到设备 echo（双向连通）", False,
+                      e.get_dbus_name())
 
     print()
     w = max(len(r[0]) for r in rows)

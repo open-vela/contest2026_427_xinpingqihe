@@ -6,6 +6,13 @@ Sources:
   * Chinese string literals passed directly to LVGL in the app sources
     (comments are stripped first, they are not rendered).
 
+不参与渲染的文件被跳过（2026-09-18 加的）：
+  * `*_blob.c` —— 自动生成的**数据块**（如 pw_skill_blob.c 内嵌整篇 skill
+    markdown 的十六进制转义）。它的"字面量"是一篇文档的正文，
+    实测一个文件就贡献 565 个汉字，占全部 725 个里的 78%；
+    这些字永远不会画到屏上，却会让 5 个字号各多出上百 KB 字形位图。
+  * `*_test_host.c` —— 主机侧单元测试，根本不进固件。
+
 Prints the lv_font_conv `-r` range list, e.g. "0x3001-0x3002,0x4E00,...".
 """
 
@@ -18,6 +25,23 @@ import sys
 def strip_comments(src):
     src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
     return re.sub(r"//[^\n]*", " ", src)
+
+
+# 只修饰别的字形、自己**没有独立字形**的格式字符。它们必须被排除：
+#   * 变体选择符 U+FE00–U+FE0F（"⚠️" = U+26A0 + U+FE0F，后者就是这个块里的）
+#   * 零宽空格/连接符/方向标记
+# 为什么必须显式排除（2026-09-18 真踩）：harvest() 的判据是"码点 ≥ 0x2E80"，
+# U+FE0F 恰好落在这个区间里，于是被当成一个"要渲染的字"塞进 lv_font_conv 的
+# -r 列表；而 DroidSansFallback 根本没有这个字形 ⇒ lv_font_conv 报
+#   Font "…/DroidSansFallbackFull.ttf" doesn't have any characters included
+#   in range 0xfe0f-0xfe0f
+# 然后**直接以退出码 1 结束**，五个字体一个都不生成。
+# 触发它只需要在源码字面量里出现一个 "⚠️" —— 本项目的
+# phywear_skill_blob.c（自动生成，内嵌 skill markdown 的十六进制转义）
+# 里就有一个，所以整个字体流水线会莫名其妙地失败。
+FORMAT_CHARS = set(range(0xFE00, 0xFE10)) | {
+    0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2060, 0xFEFF,
+}
 
 
 def decode_c_literal(lit):
@@ -52,8 +76,9 @@ def decode_c_literal(lit):
 def harvest(text, chars):
     for m in re.finditer(r'"((?:[^"\\]|\\.)*)"', text):
         for ch in decode_c_literal(m.group(1)):
-            if ord(ch) >= 0x2E80:
-                chars.add(ord(ch))
+            o = ord(ch)
+            if o >= 0x2E80 and o not in FORMAT_CHARS:
+                chars.add(o)
 
 
 def main():
@@ -67,6 +92,9 @@ def main():
 
     for path in glob.glob(os.path.join(app, "*.c")) + \
             glob.glob(os.path.join(app, "*.h")):
+        base = os.path.basename(path)
+        if base.endswith("_blob.c") or base.endswith("_test_host.c"):
+            continue
         harvest(strip_comments(open(path, encoding="utf-8",
                                     errors="ignore").read()), chars)
 

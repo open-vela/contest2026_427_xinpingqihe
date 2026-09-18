@@ -53,6 +53,7 @@
 #include "phywear_time.h"
 #include "phywear_life.h"
 #include "pw_ai.h"
+#include "pw_btgatt.h"
 
 /****************************************************************************
  * Private Definitions
@@ -185,6 +186,125 @@ static void ui_del_cb(lv_event_t *e)
     {
       lv_timer_del(t);
     }
+}
+
+/****************************************************************************
+ * 蓝牙链路状态指示（主界面标题右侧的灰/蓝点）
+ *
+ * ⚠️ 跨线程：状态由 zblue 回调在 **Zephyr 工作队列线程**上改，界面在
+ * **phywear 主线程**上画。所以这里**只读** `pw_bt_link()`，并且只在
+ * lv_timer（GUI 线程）里碰 LVGL —— 绝不在 BT 回调里直接改界面。
+ * 详见 pw_btgatt.h 顶部。
+ ****************************************************************************/
+
+static lv_obj_t *g_bt_dot;          /* 主界面状态点；根屏重建后重新指向 */
+static lv_obj_t *g_bt_lab;          /* 旁边那两个字 */
+static uint8_t   g_bt_last;         /* 上次画出来的连接状态，避免每 250ms 白重绘 */
+static uint8_t   g_bt_dirty;        /* 1 = 还没画过（根屏刚建好） */
+static uint8_t   g_bt_timer_started;
+
+/* 根屏被删除（切语言重建 / 返回）时把指针清空：
+ * 留着悬空指针虽然还有 lv_obj_is_valid() 兜底，但那是"事后补救"；
+ * 这里直接让 tick 走"不在根屏"的早退分支，逻辑更干净。 */
+
+static void ui_bt_scr_del_cb(lv_event_t *e)
+{
+  (void)e;
+  g_bt_dot = NULL;
+  g_bt_lab = NULL;
+}
+
+static void ui_bt_btn_cb(lv_event_t *e)
+{
+  (void)e;
+  pw_scr_open(pw_bt_screen());
+}
+
+static void ui_bt_apply(uint8_t on)
+{
+  lv_color_t col = on ? PW_COL_BT_ON : PW_COL_BT_OFF;
+
+  if (g_bt_dot != NULL && lv_obj_is_valid(g_bt_dot))
+    {
+      lv_obj_set_style_bg_color(g_bt_dot, col, 0);
+      /* 已连接时给一点外发光（阴影），远看也能一眼分辨；
+       * 阴影是静态样式，不是动画，不影响帧率。 */
+      lv_obj_set_style_shadow_color(g_bt_dot, col, 0);
+      lv_obj_set_style_shadow_width(g_bt_dot, on ? 8 : 0, 0);
+      lv_obj_set_style_shadow_opa(g_bt_dot, LV_OPA_60, 0);
+    }
+
+  if (g_bt_lab != NULL && lv_obj_is_valid(g_bt_lab))
+    {
+      lv_obj_set_style_text_color(g_bt_lab, col, 0);
+    }
+}
+
+static void ui_bt_tick(lv_timer_t *t)
+{
+  FAR const struct pw_bt_link_s *lk = pw_bt_link();
+  uint8_t on = lk->connected ? 1 : 0;
+
+  (void)t;
+
+  if (g_bt_dot == NULL && g_bt_lab == NULL)
+    {
+      return;                     /* 当前不在根屏（已返回上一级），不用画 */
+    }
+
+  if (!g_bt_dirty && on == g_bt_last)
+    {
+      return;                     /* 状态没变，不重绘 */
+    }
+
+  g_bt_last = on;
+  g_bt_dirty = 0;
+  ui_bt_apply(on);
+}
+
+/* 在根屏上放一枚状态点 + 两个字。返回是否创建成功。 */
+
+static void ui_bt_indicator_add(lv_obj_t *scr)
+{
+  lv_obj_t *box;
+  lv_obj_t *dot;
+  lv_obj_t *lab;
+
+  /* 位置：标题行右半、两个入口按钮的左侧。
+   * 几何：屏宽 390；「语」在 x=254（宽 56）、「…」在 x=310（宽 60）；
+   * 标题 "PhyWear" 用 28px，从 x=36 起约到 145。所以 190~250 这段是空的。
+   *
+   * 做成**可点**而不是纯装饰：这一页（链路状态 + 收发原文）是现场验收时
+   * 最想看的东西，一指可达才对得起它；也省掉在工具板块里再塞一行
+   * （那个列表已经 5 行占满内容区，第 6 行要滚动才看得见）。 */
+
+  box = lv_obj_create(scr);
+  lv_obj_set_size(box, 62, 44);
+  lv_obj_set_pos(box, 190, 10);
+  lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(box, 0, 0);
+  lv_obj_set_style_pad_all(box, 0, 0);
+  lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(box, ui_bt_btn_cb, LV_EVENT_CLICKED, NULL);
+  pw_press_style(box);
+
+  dot = lv_obj_create(box);
+  lv_obj_set_size(dot, 10, 10);
+  lv_obj_set_pos(dot, 6, 16);
+  lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(dot, 0, 0);
+  lv_obj_set_style_pad_all(dot, 0, 0);
+  pw_deco(dot);                   /* 纯指示，点击要冒泡到 box */
+
+  lab = pw_label_new(box, pw_i18n_is_zh() ? "蓝牙" : "BT",
+                     PW_FNT_BODY, PW_COL_BT_OFF);
+  lv_obj_set_pos(lab, 20, 9);
+  pw_deco(lab);
+
+  g_bt_dot = dot;
+  g_bt_lab = lab;
+  g_bt_dirty = 1;
+  ui_bt_tick(NULL);               /* 立即画一次，别等 250ms */
 }
 
 /****************************************************************************
@@ -988,6 +1108,206 @@ static void pw_ui_rebuild_root(void *ud)
   pw_ui_root();
 }
 
+/* 蓝牙页：手表版"蓝牙串口" + 连通性测试。
+ *
+ * 为什么这一页值得单独做：
+ *   在此之前"蓝牙通了没有"只能靠串口日志或手机屏幕判断 —— 手表自己是个黑盒。
+ *   这一页把链路状态（连没连、对端是谁、MTU 多少、收发几条）和最近 10 条
+ *   收发原文直接摆到表盘上，于是**不接电脑也能现场验收**。
+ *
+ * 数据来源全部是 pw_bt_link() 的只读快照；页面本身不碰 BT 栈，
+ * 也不在 BT 回调里被碰（见 pw_btgatt.h 的跨线程约定）。 */
+
+static lv_obj_t *g_btp_scr;
+static lv_obj_t *g_btp_state;      /* 大字：未连接 / 已连接 */
+static lv_obj_t *g_btp_peer;       /* 对端地址 */
+static lv_obj_t *g_btp_stat;       /* RX/TX/MTU 一行 */
+static lv_obj_t *g_btp_rows[PW_BT_LOG_LINES];
+static uint32_t  g_btp_shown;      /* 已显示到第几条（UI 私有，不回写共享状态） */
+
+static void btp_del_cb(lv_event_t *e)
+{
+  (void)e;
+  g_btp_scr = NULL;
+  g_btp_state = NULL;
+  g_btp_peer = NULL;
+  g_btp_stat = NULL;
+  memset(g_btp_rows, 0, sizeof(g_btp_rows));
+}
+
+static void btp_send_cb(lv_event_t *e)
+{
+  char msg[PW_BT_TEXT_MAX + 1];
+  int rc;
+
+  (void)e;
+
+  snprintf(msg, sizeof(msg), "hello from PhyWear #%u",
+           (unsigned)(g_btp_shown + 1));
+  rc = pw_bt_send_text(msg);
+
+  /* 失败要把原因写在脸上，别让用户以为"点了没反应"：
+   * -ENOTCONN = 还没连上；-EBUSY = 上一条还在发；-EINVAL = 文本不合法 */
+  if (rc != 0)
+    {
+      lv_label_set_text_fmt(g_btp_peer, "send rc=%d (%s)", rc,
+                            rc == -ENOTCONN ? "not connected" :
+                            rc == -EBUSY    ? "busy" : "bad text");
+    }
+}
+
+/* 清空：只重置**显示游标**，不动共享日志。
+ * 为什么不去 memset 环形缓冲：那要和 BT 线程抢着写同一块内存，
+ * 为了一个"清屏"按钮去在 HCI 路径上加锁不值得。 */
+
+static void btp_clear_cb(lv_event_t *e)
+{
+  FAR const struct pw_bt_link_s *lk = pw_bt_link();
+
+  (void)e;
+  g_btp_shown = lk->seq;
+}
+
+static void btp_tick(lv_timer_t *t)
+{
+  FAR const struct pw_bt_link_s *lk = pw_bt_link();
+  uint32_t n;
+  int i;
+
+  (void)t;
+
+  if (g_btp_scr == NULL || !lv_obj_is_valid(g_btp_scr))
+    {
+      return;
+    }
+
+  /* 状态区 */
+  lv_label_set_text(g_btp_state,
+                    lk->connected ? (lk->subscribed ? "已连接 · 已订阅"
+                                                   : "已连接")
+                                  : "未连接");
+  lv_obj_set_style_text_color(g_btp_state,
+                              lk->connected ? PW_COL_BT_ON : PW_COL_BT_OFF, 0);
+
+  if (lk->connected)
+    {
+      lv_label_set_text_fmt(g_btp_peer, "对端 %s",
+                            lk->peer[0] ? lk->peer : "(unknown)");
+    }
+  else
+    {
+      /* 未连接时把"为什么"也写清楚：这页很大一部分价值就是省掉"拿电脑看日志" */
+      lv_label_set_text(g_btp_peer, "广播中，等待手机/电脑连接");
+    }
+
+  lv_label_set_text_fmt(g_btp_stat, "RX %u · TX %u · echo %u · MTU %u",
+                        (unsigned)lk->rx, (unsigned)lk->tx,
+                        (unsigned)lk->echo, (unsigned)lk->mtu);
+
+  /* 日志区：只在有新行时整体重画（seq 是单调递增的写入计数） */
+  n = lk->seq;
+
+  if (n != g_btp_shown)
+    {
+      uint32_t first = (n > PW_BT_LOG_LINES) ? n - PW_BT_LOG_LINES : 0;
+
+      g_btp_shown = n;
+
+      for (i = 0; i < PW_BT_LOG_LINES; i++)
+        {
+          uint32_t idx = first + (uint32_t)i;
+
+          if (idx >= n)
+            {
+              lv_label_set_text(g_btp_rows[i], "");
+              continue;
+            }
+
+          {
+            FAR const struct pw_bt_logline_s *ln =
+              &lk->log[idx % PW_BT_LOG_LINES];
+            const char *tag = ln->dir == PW_BT_DIR_RX ? "[RX]" :
+                              ln->dir == PW_BT_DIR_TX ? "[TX]" : "[--]";
+
+            lv_label_set_text_fmt(g_btp_rows[i], "%s %s", tag, ln->text);
+            lv_obj_set_style_text_color(g_btp_rows[i],
+                          ln->dir == PW_BT_DIR_RX ? PW_COL_TEXT :
+                          ln->dir == PW_BT_DIR_TX ? PW_COL_BT_ON :
+                                                    PW_COL_DIM, 0);
+          }
+        }
+    }
+}
+
+lv_obj_t *pw_bt_screen(void)
+{
+  lv_obj_t *scr = pw_scr_new();
+  lv_obj_t *cont = pw_topbar(scr, pw_i18n_is_zh() ? "蓝牙" : "Bluetooth");
+  lv_obj_t *card;
+  lv_obj_t *lab;
+  lv_obj_t *btn;
+  int i;
+
+  g_btp_shown = 0;
+  memset(g_btp_rows, 0, sizeof(g_btp_rows));
+  g_btp_scr = scr;
+  lv_obj_add_event_cb(scr, btp_del_cb, LV_EVENT_DELETE, NULL);
+
+  /* ── 链路状态卡（390-16 宽，92 高）── */
+
+  card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 92, PW_COL_CARD);
+  lv_obj_set_pos(card, MENU_X0, MENU_GAP);
+
+  g_btp_state = pw_label_new(card, "-", PW_FNT_MED, PW_COL_BT_OFF);
+  lv_obj_set_pos(g_btp_state, 16, 10);
+
+  g_btp_peer = pw_label_new(card, "-", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(g_btp_peer, 16, 40);
+
+  g_btp_stat = pw_label_new(card, "-", PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(g_btp_stat, 16, 64);
+
+  /* ── 收发日志卡（212 高，10 行）──
+   * 前缀 [RX]/[TX] 是本页的判据：RX 有行 = 手机真的写进来了；
+   * TX 有行 = 手表真的 notify 出去了。两边都有 = 双向连通。 */
+
+  card = pw_card_new(cont, PW_SCREEN_W - 2 * MENU_X0, 212, PW_COL_CARD);
+  lv_obj_set_pos(card, MENU_X0, 108);
+
+  pw_section_bar(card, PW_COL_BT_ON, 12, 10);
+  lab = pw_label_new(card, pw_i18n_is_zh() ? "收发日志" : "TX/RX log",
+                     PW_FNT_BODY, PW_COL_DIM);
+  lv_obj_set_pos(lab, 24, 6);
+
+  for (i = 0; i < PW_BT_LOG_LINES; i++)
+    {
+      g_btp_rows[i] = pw_label_new(card, "", PW_FNT_BODY, PW_COL_DIM);
+      lv_obj_set_pos(g_btp_rows[i], 12, 30 + i * 17);
+    }
+
+  /* ── 按钮：发送测试 / 清空 ── */
+
+  btn = pw_card_new(cont, 183, 48, PW_COL_CARD_LT);
+  lv_obj_set_pos(btn, MENU_X0, 328);
+  lv_obj_add_event_cb(btn, btp_send_cb, LV_EVENT_CLICKED, NULL);
+  lab = pw_label_new(btn, pw_i18n_is_zh() ? "发送测试" : "Send test",
+                     PW_FNT_MED, PW_COL_BT_ON);
+  lv_obj_center(lab);
+
+  btn = pw_card_new(cont, 183, 48, PW_COL_CARD);
+  lv_obj_set_pos(btn, MENU_X0 + 183 + MENU_GAP, 328);
+  lv_obj_add_event_cb(btn, btp_clear_cb, LV_EVENT_CLICKED, NULL);
+  lab = pw_label_new(btn, pw_i18n_is_zh() ? "清空" : "Clear",
+                     PW_FNT_MED, PW_COL_DIM);
+  lv_obj_center(lab);
+
+  /* 300ms 刷新：够快（连接状态肉眼即时）又够省（没变时只做两次比较） */
+  pw_scr_set_tick(scr, btp_tick, 300);
+  btp_tick(NULL);
+
+  return scr;
+}
+
 /* 语音助手页：应答文案（设备无离线 TTS/ASR，真识别需 Agent/网络，页面内如实标注） */
 
 lv_obj_t *pw_voice_screen(void)
@@ -1150,7 +1470,18 @@ void pw_ui_root(void)
       lv_timer_create(ui_timer_tick, 1000, NULL);
     }
 
+  /* 一次性注册蓝牙状态轮询（4Hz）。
+   * 为什么用轮询而不是"回调里直接改界面"：连接/断开发生在 Zephyr 工作队列
+   * 线程上，那里碰 LVGL 会跨线程操作渲染器。250ms 的轮询对"插上充电器才变"
+   * 这种状态量绰绰有余，而且状态没变时这一次回调只做两次比较就返回。 */
+  if (!g_bt_timer_started)
+    {
+      g_bt_timer_started = true;
+      lv_timer_create(ui_bt_tick, 250, NULL);
+    }
+
   scr = pw_scr_new();
+  lv_obj_add_event_cb(scr, ui_bt_scr_del_cb, LV_EVENT_DELETE, NULL);
 
   /* 标题行（左边缘圆弧屏切角：文本需右移进安全区） */
 
@@ -1160,6 +1491,11 @@ void pw_ui_root(void)
   lab = pw_label_new(scr, PW_STR(UI_SUBTITLE),
                      PW_FNT_BODY, PW_COL_DIM);
   lv_obj_set_pos(lab, MENU_X0 + 28, 46);
+
+  /* 蓝牙链路指示（灰色=未连接 / 蓝色=已连接）。
+   * 放在"语""…"两个入口的左边 —— 见 ui_bt_indicator_add() 里的几何说明。 */
+
+  ui_bt_indicator_add(scr);
 
   /* 右上角设置入口（phyphox 溢出菜单思想的极简版） */
 

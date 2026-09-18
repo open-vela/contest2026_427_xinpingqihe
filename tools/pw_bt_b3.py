@@ -56,8 +56,19 @@ CHECKS = [
      "通知发送报错 —— 把该行贴给 DSH", True),
 ]
 
+# 文本串口（…a003）的额外设备侧判据；只有 --text 时才参与判定。
+# 为什么这两项要限定在"已连接之后"：设备侧自检自己也会往文本特征写一条
+# "selftest" 并记进日志 —— 用全量日志去找 "[bt] msg in" 会把自检那条算成
+# 手机写的（这正是 B3 判定器当初假 PASS 的同一类错误）。
+TEXT_CHECKS = [
+    ("text_in", "手机写文本进来了", r"\[bt\] msg in #\d+ \(\d+ B\): '.*'",
+     "没收到文本写 —— 检查 …a003 是否可写、宿主是否写了"),
+    ("text_echo", "设备把 echo 发回去了", r"\[bt\] echo tx rc=0: 'echo: .*'",
+     "没发 echo —— 看是否订阅了 …a003（未订阅时会打 'echo skipped'）"),
+]
 
-def evaluate(text):
+
+def evaluate(text, text_mode=False):
     """判定。
 
     ⚠️ 关键：订阅(ccc)与写入(cmd #)这两项**必须在"已连接"之后**才算数 ——
@@ -69,10 +80,13 @@ def evaluate(text):
         pass
     after_conn = text[m.end():] if m else ""
 
+    checks = list(CHECKS) + (list(TEXT_CHECKS) if text_mode else [])
+    post = ("notify_on", "cmd_in", "text_in", "text_echo")
+
     rows = []
     ok_all = True
-    for name, label, pattern, hint, *negate in CHECKS:
-        scope = after_conn if name in ("notify_on", "cmd_in") else text
+    for name, label, pattern, hint, *negate in checks:
+        scope = after_conn if name in post else text
         hit = re.search(pattern, scope) is not None
         good = (not hit) if negate else hit
         rows.append((name, label, good, hint))
@@ -123,13 +137,42 @@ SELFTEST_CASES = [
 [bt] ccc changed -> notify ON
 [bt] cmd #2 (4 B): 'ping'
 """),
+    ("文本串口：连上后收发都成（--text）", True, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] msg in #1 (8 B): 'selftest'
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] text ccc -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+[bt] msg in #2 (15 B): 'hello-1758200000'
+[bt] echo tx rc=0: 'echo: hello-1758200000'
+"""),
+    ("文本串口：只有自检写的那条（连接前）—— 必须 FAIL", False, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] msg in #1 (8 B): 'selftest'
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+"""),
+    ("文本串口：收到了但没订阅 ⇒ 没发 echo —— 必须 FAIL", False, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+[bt] msg in #2 (15 B): 'hello-1758200000'
+[bt] echo skipped (文本特征未订阅)
+"""),
 ]
 
 
 def run_selftest():
     bad = 0
     for label, want, text in SELFTEST_CASES:
-        rows, got = evaluate(text)
+        tm = "文本串口" in label
+        rows, got = evaluate(text, tm)
         mark = "PASS" if got == want else "FAIL"
         if got != want:
             bad += 1
@@ -162,8 +205,10 @@ def _run_central(args, sess):
     log(f"启动宿主侧中心设备：{script}")
     pr = None
     try:
-        pr = subprocess.Popen([sys.executable, script,
-                               "--timeout", str(args.central_timeout)],
+        cmd = [sys.executable, script, "--timeout", str(args.central_timeout)]
+        if args.text:
+            cmd.append("--text-test")
+        pr = subprocess.Popen(cmd,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True)
         deadline = time.time() + 180.0
@@ -209,6 +254,9 @@ def main():
                          "（本机 hci0 可用时，B3 可以完全无人化跑完）")
     ap.add_argument("--central-timeout", type=float, default=40.0,
                     help="宿主侧中心设备的扫描/等超时（秒），默认 40")
+    ap.add_argument("--text", action="store_true",
+                    help="额外验文本串口（…a003）：宿主写一条带时间戳的文本，"
+                         "要求设备侧出现 [bt] msg in 且把 echo 发回去")
     args = ap.parse_args()
 
     if args.selftest:
@@ -275,7 +323,7 @@ def main():
         text = bytes(sess.raw).decode("utf-8", "replace")
         text = re.sub(r"\x1b\[[0-9;]*m", "", text)
 
-    rows, ok_all = evaluate(text)
+    rows, ok_all = evaluate(text, args.text)
 
     print()
     print(f"{'判定':<6}{'检查项':<18}说明")

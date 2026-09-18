@@ -7,7 +7,10 @@
  *   Service  PhyWear Physics      e0f1a000-1b2c-4d5e-8f90-a1b2c3d4e5f6
  *     ├─ Sensor  READ | NOTIFY    e0f1a001-…  ← 16 B 小端传感器快照
  *     │    └─ CCC（订阅开关）
- *     └─ Command WRITE | WRITE_NR e0f1a002-…  ← 手机写命令，串口回显
+ *     ├─ Command WRITE | WRITE_NR e0f1a002-…  ← 手机写命令，串口回显
+ *     └─ Text    READ | WRITE | WRITE_NR | NOTIFY  e0f1a003-…
+ *          └─ CCC        ← 「手表版蓝牙串口」：手机写自由文本、手表回 echo、
+ *                          手表也能主动 notify 文本给手机（页面按 [TX]/[RX] 显示）
  *
  * Sensor 包（16 B，全部小端）：
  *   int16 ax, ay, az   mg
@@ -20,10 +23,17 @@
  *      因此在哪个 task_group 里跑都合法（这一点刚在 H4 上踩过坑，见 docs/16）；
  *   ② bt_gatt_notify() 最终只走到 h4_send() → tx_fifo，不碰 fd；
  *   ③ 只在**有订阅者**时才采样，避免空转。
+ *
+ * 跨线程（2026-09-18 晚新增 UI 后必须牢记）：
+ *   本文件里的回调（连接/断开/CCC/写特征）在 **Zephyr 系统工作队列**线程上，
+ *   而界面在 **phywear 主线程**上。所以回调里只允许写 `g_link` 里的标志与
+ *   环形日志，**绝不调用 LVGL**；界面侧只读 `pw_bt_link()`。
+ *   详见 pw_btgatt.h 顶部的约定说明。
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -33,6 +43,7 @@
 #include <zephyr/bluetooth/gatt.h>
 
 #include "phywear_sensors.h"
+#include "pw_btgatt.h"
 
 /* UUID 按 LSB-first 排布（BT_UUID_INIT_128 的字节序） */
 
@@ -48,6 +59,22 @@ static const struct bt_uuid_128 pw_cmd_uuid = BT_UUID_INIT_128(
   0xf6, 0xe5, 0xd4, 0xc3, 0xb2, 0xa1, 0x90, 0x8f,
   0x5e, 0x4d, 0x2c, 0x1b, 0x02, 0xa0, 0xf1, 0xe0);
 
+static const struct bt_uuid_128 pw_text_uuid = BT_UUID_INIT_128(
+  0xf6, 0xe5, 0xd4, 0xc3, 0xb2, 0xa1, 0x90, 0x8f,
+  0x5e, 0x4d, 0x2c, 0x1b, 0x03, 0xa0, 0xf1, 0xe0);
+
+/* ── 属性表的索引与前置声明 ─────────────────────────────────────────────
+ * 索引必须**具名**：回调里到处是 `&pw_attrs[7]` 这种写法，写裸数字时
+ * 一旦有人在中间插一条特征，索引会静默错位（读到别人的值句柄），
+ * 而编译、自检、手机侧全都不报错 —— 属于最难查的一类。
+ * 前置声明是为了让"手表→手机"的发送工作项能先于表定义引用它。 */
+
+#define PW_ATTR_SENSOR_VALUE   2    /* e0f1a001 值句柄（特征声明在 1） */
+#define PW_ATTR_CMD_VALUE      5    /* e0f1a002 值句柄 */
+#define PW_ATTR_TEXT_VALUE     7    /* e0f1a003 值句柄（新增，追加在表尾） */
+
+static struct bt_gatt_attr pw_attrs[];
+
 /* ── 状态 ───────────────────────────────────────────────────────────── */
 
 struct pw_bt_pkt_s
@@ -59,12 +86,120 @@ struct pw_bt_pkt_s
 } __attribute__((packed));
 
 static struct pw_bt_pkt_s   g_pkt;
-static uint8_t              g_nfy_on;       /* CCC 是否已订阅 */
+static uint8_t              g_nfy_on;       /* 传感器 CCC 是否已订阅 */
+static uint8_t              g_text_sub;     /* 文本特征 CCC 是否已订阅 */
 static uint16_t             g_cmd_count;
 static char                 g_last_cmd[32];
 static struct k_work_delayable g_sample_work;
 
+/* UI 可见的链路状态 + 文本串口日志（写入方是 BT 回调，见 pw_btgatt.h 约定） */
+static struct pw_bt_link_s  g_link;
+
+/* 手表 → 手机 的文本发送队列（只放一条，连点就 -EBUSY） */
+static struct k_work       g_text_work;
+static char                g_text_out[PW_BT_TEXT_MAX + 1];
+static uint8_t             g_text_pending;
+
 #define PW_SAMPLE_MS   500
+
+/* ── 链路状态 / 文本日志（BT 线程写，UI 线程读）──────────────────────── */
+
+FAR const struct pw_bt_link_s *pw_bt_link(void)
+{
+  return &g_link;
+}
+
+/* 往环形日志里追加一行。
+ *
+ * 只做整字宽写入 + 最后自增 seq：seq 是"这一行已写完"的标记，
+ * UI 看到 seq 变了才重画。极端情况下 UI 可能读到半行（见头文件说明），
+ * 下一次刷新会自我修正 —— 换取的收益是 HCI 回调里不加锁、不阻塞。 */
+static void pw_bt_log(uint8_t dir, FAR const char *text)
+{
+  uint32_t n = g_link.seq;
+  FAR struct pw_bt_logline_s *ln = &g_link.log[n % PW_BT_LOG_LINES];
+  size_t i;
+
+  for (i = 0; i < PW_BT_TEXT_MAX && text[i] != '\0'; i++)
+    {
+      char ch = text[i];
+
+      /* 串口日志只放可打印 ASCII：控制字符会让 LVGL 的文本渲染错位，
+       * 非 ASCII（UTF-8 多字节）在页面上也要按字节截断才不会半个字。 */
+      ln->text[i] = (ch >= 0x20 && ch < 0x7f) ? ch : '.';
+    }
+
+  ln->text[i] = '\0';
+  ln->dir = dir;
+  g_link.seq = n + 1;
+}
+
+static void pw_bt_log_reset(void)
+{
+  memset(g_link.log, 0, sizeof(g_link.log));
+  g_link.seq = 1;
+  g_link.log[0].dir = PW_BT_DIR_SYS;
+  strcpy(g_link.log[0].text, "PhyWear BT console");
+}
+
+/* 手表 → 手机：真正发送（跑在 Zephyr 工作队列线程上） */
+static void pw_text_work_handler(struct k_work *work)
+{
+  int rc;
+
+  (void)work;
+
+  if (!g_text_pending)
+    {
+      return;
+    }
+
+  g_text_pending = 0;
+
+  /* 句柄不变式：attrs[6]=chrc decl, [7]=text value, [8]=CCC
+   * （新增特征追加在表尾，所以旧的 0x0010/0x0011/0x0013 都不受影响） */
+  rc = bt_gatt_notify(NULL, &pw_attrs[PW_ATTR_TEXT_VALUE], g_text_out,
+                      strlen(g_text_out));
+  printf("[bt] text tx rc=%d: '%s'\n", rc, g_text_out);
+
+  if (rc == 0)
+    {
+      g_link.tx++;
+    }
+}
+
+int pw_bt_send_text(FAR const char *text)
+{
+  size_t n;
+
+  if (text == NULL)
+    {
+      return -EINVAL;
+    }
+
+  n = strlen(text);
+  if (n == 0 || n > PW_BT_TEXT_MAX)
+    {
+      return -EINVAL;
+    }
+
+  if (!g_link.connected)
+    {
+      return -ENOTCONN;
+    }
+
+  /* 上一条还没发完就别覆盖 —— 按钮连点时这是正常拒绝，不是故障。 */
+  if (k_work_busy_get(&g_text_work) != 0)
+    {
+      return -EBUSY;
+    }
+
+  memcpy(g_text_out, text, n + 1);
+  g_text_pending = 1;
+  pw_bt_log(PW_BT_DIR_TX, text);
+  k_work_submit(&g_text_work);
+  return 0;
+}
 
 /* ── GATT 回调 ──────────────────────────────────────────────────────── */
 
@@ -136,11 +271,101 @@ static void pw_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
   (void)attr;
   g_nfy_on = (value & BT_GATT_CCC_NOTIFY) ? 1 : 0;
+  g_link.subscribed = g_nfy_on || g_text_sub;
   printf("[bt] ccc changed -> notify %s\n", g_nfy_on ? "ON" : "OFF");
 }
 
+/* ── 文本特征 e0f1a003：「手表版蓝牙串口」──────────────────────────────
+ *
+ * 读：回一句状态文本（手机端可以直接点"读"看设备状态，不必解析二进制）
+ * 写：① 计数 + 打串口原文（证据）② 记进 [RX] 日志（页面显示）
+ *     ③ **回一条 echo 给手机** —— 这就是"连通性测试"的判据：
+ *        手机写进去、又原样收回来，说明两个方向的空口链路都通。
+ */
+static ssize_t pw_text_read(struct bt_conn *conn,
+                            const struct bt_gatt_attr *attr, void *buf,
+                            uint16_t len, uint16_t offset)
+{
+  char st[80];
+  int n;
+
+  n = snprintf(st, sizeof(st),
+               "PhyWear bt conn=%u sub=%u rx=%u tx=%u echo=%u mtu=%u",
+               (unsigned)g_link.connected, (unsigned)g_link.subscribed,
+               (unsigned)g_link.rx, (unsigned)g_link.tx,
+               (unsigned)g_link.echo, (unsigned)g_link.mtu);
+
+  return bt_gatt_attr_read(conn, attr, buf, len, offset, st, (uint16_t)n);
+}
+
+static ssize_t pw_text_write(struct bt_conn *conn,
+                             const struct bt_gatt_attr *attr, const void *buf,
+                             uint16_t len, uint16_t offset, uint8_t flags)
+{
+  char in[PW_BT_TEXT_MAX + 1];
+  char echo[PW_BT_TEXT_MAX + 16];
+  size_t n = len;
+
+  (void)conn;
+  (void)attr;
+  (void)flags;
+
+  if (offset != 0)
+    {
+      return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+  if (n > PW_BT_TEXT_MAX)
+    {
+      n = PW_BT_TEXT_MAX;
+    }
+
+  memcpy(in, buf, n);
+  in[n] = '\0';
+
+  g_link.rx++;
+  pw_bt_log(PW_BT_DIR_RX, in);
+  printf("[bt] msg in #%u (%u B): '%s'\n", (unsigned)g_link.rx,
+         (unsigned)len, in);
+
+  /* 回 echo：这是"手机写进来了"与"手表能主动发出去"两件事的合并判据。
+   * 没订阅就不发（发了也没人收），但**仍然在日志里记一条**，
+   * 这样页面/串口上能看出"收到了但对方没订阅"。 */
+  snprintf(echo, sizeof(echo), "echo: %s", in);
+
+  if (g_text_sub)
+    {
+      int rc = bt_gatt_notify(NULL, &pw_attrs[PW_ATTR_TEXT_VALUE], echo,
+                              strlen(echo));
+
+      printf("[bt] echo tx rc=%d: '%s'\n", rc, echo);
+      if (rc == 0)
+        {
+          g_link.echo++;
+          g_link.tx++;
+          pw_bt_log(PW_BT_DIR_TX, echo);
+        }
+    }
+  else
+    {
+      printf("[bt] echo skipped (文本特征未订阅)\n");
+    }
+
+  return len;
+}
+
+static void pw_text_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+  (void)attr;
+  g_text_sub = (value & BT_GATT_CCC_NOTIFY) ? 1 : 0;
+  g_link.subscribed = g_nfy_on || g_text_sub;
+  printf("[bt] text ccc -> notify %s\n", g_text_sub ? "ON" : "OFF");
+}
+
 /* 属性表：0=service, 1=chrc decl, 2=chrc value(Sensor), 3=ccc, 4=chrc decl,
- *         5=chrc value(Command) */
+ *         5=chrc value(Command), 6=chrc decl, 7=chrc value(Text), 8=ccc
+ * 新的文本特征**追加在表尾**，所以旧的句柄（0x0010/0x0011/0x0013）不变 ——
+ * 手机上已经存过的句柄表、以及验收脚本里的结构断言都不会因此失效。 */
 
 static struct bt_gatt_attr pw_attrs[] =
 {
@@ -156,11 +381,16 @@ static struct bt_gatt_attr pw_attrs[] =
                          BT_GATT_CHRC_WRITE | BT_GATT_CHRC_WRITE_WITHOUT_RESP,
                          BT_GATT_PERM_WRITE,
                          NULL, pw_write_cmd, NULL),
+
+  BT_GATT_CHARACTERISTIC(&pw_text_uuid.uuid,
+                         BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE |
+                         BT_GATT_CHRC_WRITE_WITHOUT_RESP | BT_GATT_CHRC_NOTIFY,
+                         BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                         pw_text_read, pw_text_write, NULL),
+  BT_GATT_CCC(pw_text_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 };
 
 static struct bt_gatt_service pw_svc = BT_GATT_SERVICE(pw_attrs);
-
-#define PW_ATTR_SENSOR_VALUE   2
 
 /* ── 采样 + 通知 ────────────────────────────────────────────────────── */
 
@@ -309,6 +539,18 @@ static void pw_connected(struct bt_conn *conn, uint8_t err)
   bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
   printf("[bt] B3 connected: %s err=%u\n", addr, err);
   g_nfy_on = 0;
+  g_text_sub = 0;
+
+  if (err == 0)
+    {
+      g_link.connected = 1;
+      g_link.subscribed = 0;
+      g_link.mtu = bt_gatt_get_mtu(conn);
+      strncpy(g_link.peer, addr, sizeof(g_link.peer) - 1);
+      g_link.peer[sizeof(g_link.peer) - 1] = '\0';
+      pw_bt_log(PW_BT_DIR_SYS, addr);
+      printf("[bt] link up mtu=%u\n", (unsigned)g_link.mtu);
+    }
 }
 
 static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
@@ -318,6 +560,14 @@ static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
   bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
   printf("[bt] B3 disconnected: %s reason=0x%02x\n", addr, reason);
   g_nfy_on = 0;
+  g_text_sub = 0;
+
+  g_link.connected = 0;
+  g_link.subscribed = 0;
+  g_link.mtu = 0;
+  g_link.peer[0] = '\0';
+  g_text_pending = 0;
+  pw_bt_log(PW_BT_DIR_SYS, "disconnected");
 }
 
 static struct bt_conn_cb pw_conn_cb =
@@ -466,12 +716,53 @@ static int pw_btgatt_selftest(void)
    * 用 "selftest" 这个**专用**命令名，避免与人工手机写入（比如 "ping"）混淆 ——
    * B3 判定器就是靠区分这两者才不会误判"手机写进来了"。 */
   printf("[bt] SELFTEST write cmd \"selftest\" ->\n");
-  n = pw_write_cmd(NULL, &pw_attrs[5], "selftest", 8, 0, 0);
+  n = pw_write_cmd(NULL, &pw_attrs[PW_ATTR_CMD_VALUE], "selftest", 8, 0, 0);
   printf("[bt] SELFTEST write ret=%d (want 8)\n", (int)n);
   if (n != 8 || g_cmd_count == 0)
     {
       fails++;
     }
+
+  /* ③b 文本串口（…a003）：读一句状态 + 走一遍写回调。
+   * 写回调除了记日志，还会尝试回 echo —— 没有订阅者时它走"跳过"分支，
+   * 但**日志与计数必须照记**，否则页面在没人订阅时看着像"没收到"。 */
+  {
+    char sbuf[96];
+    uint32_t rx0 = g_link.rx;
+
+    memset(sbuf, 0, sizeof(sbuf));
+    n = pw_text_read(NULL, &pw_attrs[PW_ATTR_TEXT_VALUE], sbuf,
+                     sizeof(sbuf), 0);
+    printf("[bt] SELFTEST text read -> %d B: '%s'\n", (int)n, sbuf);
+    if (n <= 0)
+      {
+        fails++;
+      }
+
+    n = pw_text_write(NULL, &pw_attrs[PW_ATTR_TEXT_VALUE], "selftest", 8, 0, 0);
+    if (n != 8 || g_link.rx != rx0 + 1)
+      {
+        printf("[bt] SELFTEST FAIL 文本写回调没记进日志/计数 (ret=%d rx=%u)\n",
+               (int)n, (unsigned)g_link.rx);
+        fails++;
+      }
+
+    /* 结构断言：文本特征的 CCC 也必须紧跟它的值句柄 */
+    if (pw_attrs[PW_ATTR_TEXT_VALUE].handle == 0 ||
+        pw_attrs[PW_ATTR_TEXT_VALUE + 1].handle !=
+        pw_attrs[PW_ATTR_TEXT_VALUE].handle + 1)
+      {
+        printf("[bt] SELFTEST FAIL 文本特征句柄结构不对 (value=0x%04x ccc=0x%04x)\n",
+               pw_attrs[PW_ATTR_TEXT_VALUE].handle,
+               pw_attrs[PW_ATTR_TEXT_VALUE + 1].handle);
+        fails++;
+      }
+
+    printf("[bt] SELFTEST text handles: value=0x%04x ccc=0x%04x cmd=0x%04x\n",
+           pw_attrs[PW_ATTR_TEXT_VALUE].handle,
+           pw_attrs[PW_ATTR_TEXT_VALUE + 1].handle,
+           pw_attrs[PW_ATTR_CMD_VALUE].handle);
+  }
 
   /* ④ 通知路径演练。
    * 为什么需要：这条链（CCC 订阅 → 周期采样 → bt_gatt_notify）**只在有订阅者时**
@@ -513,6 +804,9 @@ int pw_btgatt_start(void)
   int rc;
 
   memset(&g_pkt, 0, sizeof(g_pkt));
+  memset(&g_link, 0, sizeof(g_link));
+  pw_bt_log_reset();
+  k_work_init(&g_text_work, pw_text_work_handler);
 
   rc = bt_gatt_service_register(&pw_svc);
   printf("[bt] B2 gatt register rc=%d %s\n", rc, rc == 0 ? "(ok)" : "(FAILED)");

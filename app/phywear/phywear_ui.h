@@ -91,6 +91,13 @@ struct pw_graph_s;   /* 前向声明，避免强依赖 pw_graph.h */
 #define PW_COL_LINE     lv_color_hex(0x475569)  /* 卡片 hairline 描边（colors.csv Border） */
 #define PW_COL_GRID     lv_color_hex(0x475569)  /* 网格/描边（colors.csv Border） */
 
+/* 蓝牙链路状态色（2026-09-18）。
+ * 为什么这里多一个蓝：全局纪律是"只 1 个强调色"（绿 = 实时/正常），
+ * 而这一枚是**设备状态指示**而不是新强调色 —— 与宫格"一区一色"同类。
+ * 用户明确要求：未连接 = 灰，已连接 = 蓝。 */
+#define PW_COL_BT_OFF   lv_color_hex(0x5B6875)  /* 未连接（= PW_COL_FAINT 灰） */
+#define PW_COL_BT_ON    lv_color_hex(0x3B82F6)  /* 已连接（蓝） */
+
 /* 常用字体快捷宏。
  * BODY..XL = PhyWear 合并字体 pw_font_*（Montserrat Latin + Droid CJK 子集，
  * i18n 阶段2），XXL 保持 montserrat_48（纯数字大读数，无需 CJK）。
@@ -204,6 +211,10 @@ lv_obj_t *pw_ai_coach_screen(void);
 void pw_ui_root(void);
 
 lv_obj_t *pw_voice_screen(void);   /* 语音助手页（应答文案） */
+
+/* 蓝牙页（手表版蓝牙串口）：链路状态 + 收发文本日志 + 连通性测试按钮。
+ * 主界面标题右侧的灰/蓝状态点与这一页读的是同一份状态（pw_btgatt.h）。 */
+lv_obj_t *pw_bt_screen(void);
 
 /* 直接打开某个板块列表页（诊断/截图用）：0=力学 1=声学 2=工具 3=计时器 4=生活 5=自定义
  * 返回 0 = 索引越界。真机 UI 与 cap 截图共用同一入口。 */

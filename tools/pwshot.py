@@ -37,7 +37,7 @@ FRAME_TIMEOUT = 180.0
 PAGES = [
     "root", "raw", "pendulum", "spring", "centri", "incline", "ruler",
     "spec_accel", "spec_mic", "spec_mag", "stopwatch", "lightgate",
-    "acousticgate", "applause", "settings", "about",
+    "acousticgate", "applause", "settings", "btlink", "about",
 ]
 
 # Must match g_p2_seq[] in apps/examples/phywear/phywear.c
