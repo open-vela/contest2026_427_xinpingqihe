@@ -51,6 +51,8 @@
   **手表版蓝牙串口**新增文本特征 `e0f1a003`（手机写自由文本 → 手表 `[RX]` 并回
   `echo: …`；手表「发送测试」→ notify 给手机），空口连通性测试
   设备侧 8/8 + 宿主侧 13/13（`pw_bt_b3.py --central --text`）。
+  **桌面上还有一个图形界面版**：`bash tools/phywear/install_desktop_shortcut.sh` 在桌面
+  放一个「PhyWear 蓝牙测试」图标，双击即自动跑完同一条序列（14 项打勾 + 大字结论）。
   ⚠️ 本板**没有 WiFi 网卡**，`set_wifi`/DHCP 在本板不可达（测量数据改由 BLE 承载送上位机）。
   详见 `docs/16_蓝牙B1根因与修复.md`（含两个根因：NuttX fd 表按 `task_group`；
   zblue 通知帧句柄 0x0000 被对端静默丢弃）。

@@ -312,33 +312,41 @@ class Central:
         return msg, want, got, (None if echo is not None else "no echo")
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--name", default="PhyWear")
-    ap.add_argument("--timeout", type=float, default=30.0)
-    ap.add_argument("--notify-count", type=int, default=2)
-    ap.add_argument("--text-test", action="store_true",
-                    help="额外跑文本串口（…a003）的连通性测试："
-                         "写一条带时间戳的文本，等设备把 echo 原样发回来")
-    args = ap.parse_args()
+def run_full_test(report, name="PhyWear", timeout=30.0, notify_count=2,
+                  text_test=False):
+    """跑完整测试序列，逐项通过 `report(label, ok, detail)` 回调。
 
+    **为什么要把序列抽出来**：这条序列原本内联在 main() 里，只服务命令行。
+    后来要在桌面上放一个"点一下就测"的 GUI —— 如果 GUI 自己再实现一遍，
+    两份实现迟早会跑偏（改了一处忘了另一处，而两边都"看起来在测同一件事"）。
+    所以序列只有这一份：CLI 传一个打印回调，GUI 传一个往队列里塞的回调。
+
+    返回 (rows, info)：
+      rows = [(label, ok, detail), …]     供判定/展示
+      info = {…}                          给 GUI 展示的摘要（对端地址、|a|、echo 等）
+    """
     rows = []
+    info = {"peer": "", "mag": None, "echo": "", "packets": 0, "adapter": ""}
 
     def check(label, ok, detail=""):
         rows.append((label, ok, detail))
-        log(f"{'PASS' if ok else 'FAIL'}  {label}  {detail}")
+        report(label, ok, detail)
 
-    c = Central(args.name, args.timeout)
+    c = Central(name, timeout)
     if not c.find_adapter():
-        log("找不到 BlueZ adapter —— 宿主没有蓝牙控制器")
-        return 2
+        check("找到蓝牙适配器", False, "宿主没有蓝牙控制器（hciconfig 为空？）")
+        return rows, info
+
+    info["adapter"] = c.adapter_path or ""
+    check("找到蓝牙适配器", True, info["adapter"])
 
     dev = c.scan_for()
-    check("扫描到 PhyWear", dev is not None, str(dev) if dev else "未找到")
+    check("扫描到 PhyWear", dev is not None,
+          str(dev) if dev else "没找到 —— 手表开机了吗？主页显示「蓝牙」了吗？")
     if not dev:
-        return 1
+        return rows, info
 
+    info["peer"] = str(dev).rsplit("/", 1)[-1]
     check("连接成功且服务已解析", c.connect(dev))
     svc, chrs = c.gatt(dev)
     check("找到服务 e0f1a000-…", svc is not None, str(svc) if svc else "")
@@ -347,7 +355,7 @@ def main():
     check("找到 sensor 特征 …a001", sensor is not None)
     check("找到 cmd 特征 …a002", cmd is not None)
     if not (svc and sensor and cmd):
-        return 1
+        return rows, info
 
     try:
         val = c.read(sensor)
@@ -356,6 +364,7 @@ def main():
         ay = int.from_bytes(val[2:4], "little", signed=True) if ok else 0
         az = int.from_bytes(val[4:6], "little", signed=True) if ok else 0
         mag = (ax * ax + ay * ay + az * az) ** 0.5
+        info["mag"] = mag
         check("读 …a001 得到 16 B", ok, f"{len(val)} B")
         check("解出加速度且 |a| 合理(300~3000mg)", 300 <= mag <= 3000,
               f"ax={ax} ay={ay} az={az} mg |a|={mag:.0f} mg")
@@ -363,12 +372,13 @@ def main():
         check("读 …a001 得到 16 B", False, e.get_dbus_name())
 
     try:
-        packets = c.notify(sensor, args.notify_count, args.timeout)
-        check(f"Notify 收到 >= {args.notify_count} 个包",
-              len(packets) >= args.notify_count,
+        packets = c.notify(sensor, notify_count, timeout)
+        info["packets"] = len(packets)
+        check(f"Notify 收到 >= {notify_count} 个包",
+              len(packets) >= notify_count,
               f"收到 {len(packets)} 个，首个 {packets[0].hex() if packets else '-'}")
     except dbus.DBusException as e:
-        check(f"Notify 收到 >= {args.notify_count} 个包", False, e.get_dbus_name())
+        check(f"Notify 收到 >= {notify_count} 个包", False, e.get_dbus_name())
 
     try:
         c.write(cmd, b"ping")
@@ -377,7 +387,7 @@ def main():
         check("写 …a002 'ping' 成功", False, e.get_dbus_name())
 
     # ── 文本串口（…a003）：手表版蓝牙串口的连通性测试 ──
-    if args.text_test:
+    if text_test:
         text = chrs.get(TEXT_UUID)
         check("找到 text 特征 …a003", text is not None)
 
@@ -390,8 +400,9 @@ def main():
                 check("读 …a003 得到状态串", False, e.get_dbus_name())
 
             try:
-                msg, want, got, err = c.text_roundtrip(text, args.timeout)
+                msg, want, got, err = c.text_roundtrip(text, timeout)
                 got_s = [p.decode("utf-8", "replace") for p in got]
+                info["echo"] = got_s[0] if got_s else ""
                 check("写文本后收到设备 echo（双向连通）", err is None,
                       f"写 '{msg}' → 收到 {got_s}")
 
@@ -403,6 +414,29 @@ def main():
             except dbus.DBusException as e:
                 check("写文本后收到设备 echo（双向连通）", False,
                       e.get_dbus_name())
+
+    return rows, info
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--name", default="PhyWear")
+    ap.add_argument("--timeout", type=float, default=30.0)
+    ap.add_argument("--notify-count", type=int, default=2)
+    ap.add_argument("--text-test", action="store_true",
+                    help="额外跑文本串口（…a003）的连通性测试："
+                         "写一条带时间戳的文本，等设备把 echo 原样发回来")
+    args = ap.parse_args()
+
+    rows, _info = run_full_test(
+        lambda label, ok, detail: log(
+            f"{'PASS' if ok else 'FAIL'}  {label}  {detail}"),
+        name=args.name, timeout=args.timeout,
+        notify_count=args.notify_count, text_test=args.text_test)
+
+    if not rows:
+        return 2
 
     print()
     w = max(len(r[0]) for r in rows)

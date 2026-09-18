@@ -117,6 +117,8 @@ cmake --build cmake_out/vela_goldfish-arm64-v8a-ap-phywear -j16
    页内有状态/对端地址/MTU/收发计数 + 10 行 TX·RX 滚动日志 + 「发送测试」；
    另有文本特征 `…a003` 做**空口连通性测试**（手机写文本 → 手表回 `echo: …`，
    设备侧 8/8 + 宿主侧 13/13，`--central --text`）。
+   **不想开终端**：桌面上双击「PhyWear 蓝牙测试」图标即自动测完（图形界面，14 项打勾
+   + 实测值 + 大字结论）；图标由 `tools/phywear/install_desktop_shortcut.sh` 生成。
    **如实说明**：本队**没有在真手机（Android/iOS）上点过**，用的是宿主 BlueZ 中心设备，
    动作与手机上用 nRF Connect 完全对应；手机路径（`--wait 240`）保留可作独立交叉验证。
    ⚠️ 广播用**随机地址**（EXT_ADV + PRIVACY），**请按名字 `PhyWear` 找，不要按 MAC 找**。
