@@ -62,11 +62,13 @@ CONFIG_BLUETOOTH_SERVICE_HCI_UART_NAME="/dev/ttyHCI0"
 CONFIG_BLUETOOTH_TOOLS=y
 # CONFIG_BLUETOOTH_LOG is not set
 CONFIG_BT=y
-# PhyWear 蓝牙诊断（临时，定位 B1 根因后必须移除）：
-# 本板原先**没有** BT_DEBUG_LOG ⇒ port/include/zephyr/logging/log.h 把整个
-# host 栈 + h4.c 的 LOG_ERR/LOG_WRN 全部编译成空语句，所以 bt_enable 失败时
-# 串口上一个字都没有。level 4 = WARNING，只放 err/wrn，避免刷屏与栈压力。
-# 树里其它所有用 H4 的板（goldfish / r528 / bes）都开了 BT_DEBUG_LOG。
+# 蓝牙排障第一开关（B1 根因就是靠它才可见的，见 docs/16）：
+# 不开 BT_DEBUG_LOG 时，port/include/zephyr/logging/log.h 会把整个 host 栈 +
+# h4.c 的 LOG_ERR/LOG_WRN 编译成**空语句** —— bt_enable 失败时串口一个字都没有。
+# level 4 = WARNING，只放 err/wrn。代价：SRAM +2,096 B（占当前 496,332 B 的一部分）。
+# 要省这 2 KB 就把下面两行去掉；但注意本树 cmake 的 nuttx_export_kconfig 在符号
+# "消失"时会 configure 失败（string(REGEX MATCH) 拿到空参数），实测需清掉 build
+# 目录重新配置，别只改 defconfig。
 CONFIG_BT_DEBUG_LOG=y
 CONFIG_BT_DEBUG_LOG_LEVEL=4
 CONFIG_BT_CLASSIC=y

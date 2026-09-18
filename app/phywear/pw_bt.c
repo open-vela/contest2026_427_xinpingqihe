@@ -6,14 +6,13 @@
 
 #include <nuttx/config.h>
 
-#include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
+
+int pw_btgatt_start(void);
 
 int pw_bt_init(void)
 {
@@ -21,18 +20,9 @@ int pw_bt_init(void)
   struct timespec t1;
   long ms;
   int rc;
-  int fd;
-
-  /* 诊断：先确认 /dev/ttyHCI0 能被打开、再用单调时钟量 bt_enable 的**耗时**。
-   * 这是区分「命令超时（HCI_CMD_TIMEOUT = 10 s）」与「控制器立刻回了非 0
-   * status」的第一手判据 —— 两者都会让 rc 变成负数，但含义完全不同。 */
-  fd = open("/dev/ttyHCI0", O_RDWR | O_NONBLOCK);
-  printf("[bt] precheck open /dev/ttyHCI0 -> %d %s\n", fd,
-         fd < 0 ? strerror(errno) : "(ok)");
-  if (fd >= 0)
-    {
-      close(fd);
-    }
+  /* 单调时钟量 bt_enable 的**耗时**：这是区分「命令超时（HCI_CMD_TIMEOUT = 10 s）」
+   * 与「控制器立刻回了非 0 status / 发送路径当场失败」的第一手判据 ——
+   * 两者都会让 rc 变成负数，但含义完全不同（B1 根因就是靠它锁定"4 ms 快失败"）。 */
 
   clock_gettime(CLOCK_MONOTONIC, &t0);
   printf("[bt] calling bt_enable(NULL) ...\n");
@@ -44,5 +34,14 @@ int pw_bt_init(void)
 
   printf("[bt] bt_enable rc=%d %s elapsed=%ldms\n", rc,
          rc == 0 ? "(host stack up)" : "(FAILED)", ms);
+
+  /* B1 过了才做 B2：注册 GATT 服务 + 开可被发现广播。
+   * 失败只打印，不影响 B1 的判据。 */
+
+  if (rc == 0)
+    {
+      pw_btgatt_start();
+    }
+
   return rc;
 }

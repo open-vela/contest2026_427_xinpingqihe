@@ -76,16 +76,16 @@ struct h4_data {
 
 #define HCI_DEBUG 0
 
-/* ── PhyWear 诊断（临时）：H4 层字节级收发日志 ──────────────────────────────
- * 为什么直接 printf 而不用 LOG_DBG / h4_data_dump：
- *   ① 本板 defconfig 原先没有 CONFIG_BT_DEBUG_LOG，port 的 log.h 会把 LOG_*
- *      全部展开成空语句（连 h4_data_dump 都要再开一个本地 HCI_DEBUG 宏）；
- *   ② 我们要的是"**到底哪几个字节被写进 /dev/ttyHCI0、到底读回了哪几个字节**"
- *      —— 只有落在 fd 边界上的原始字节才能回答这个问题。
- * 取证点：h4_send() 写之前 = 真发出去的 H4 帧；h4_rx_thread() read() 之后
- *          = 真收到的原始字节（还没做任何分帧/解析）。
- * 定位到根因后请删除本函数与全部 pw_h4_dump 调用。
+/* ── H4 层字节级收发日志开关（PhyWear） ────────────────────────────────
+ * 定位 B1 根因时把它置 1，就能在串口上看到**真正写进 /dev/ttyHCI0 的 H4 帧**
+ * 与**从 fd 上读回的原始字节**（例如 TX 01 03 0c 00 → RX 04 0e 04 06 03 0c 00）。
+ * 置 0 时所有调用点被宏消掉，零 flash / 零 SRAM 开销。
+ * 另外 `nxsched_get_fdlist()` 打印用于确认"谁在写、在哪个 task_group"——
+ * 这正是本次根因的决定性证据（见 docs/16）。
  */
+#define PW_H4_TRACE 0
+
+#if PW_H4_TRACE
 #define PW_H4_DUMP_MAX 64
 
 static void pw_h4_dump(const char *tag, const uint8_t *p, size_t n)
@@ -104,16 +104,15 @@ static void pw_h4_dump(const char *tag, const uint8_t *p, size_t n)
 	printf("\n");
 }
 
-/* PhyWear 诊断：打印"当前是哪个 NuttX 任务 / 它的 fd 表是谁"。
- * NuttX 的 fd 表挂在 **task_group** 上（fs/inode/fs_files.c: file_get2 →
- * nxsched_get_fdlist → tcb->group->tg_fdlist）。Zephyr 线程在 port 层是
- * pthread_create 出来的（port/kernel/thread.c），pthread 与**创建它的任务**同组。
- * 所以"谁 open 的 fd、谁在写"如果不同组，write() 就会 EBADF。 */
 static void pw_h4_whoami(const char *tag, const struct h4_data *h4)
 {
 	printf("[H4T] %-12s tid=%d fdlist=%p h4->fd=%d\n", tag, (int)gettid(),
 	       (void *)nxsched_get_fdlist(), h4->fd);
 }
+#else
+#define pw_h4_dump(tag, p, n)  do { } while (0)
+#define pw_h4_whoami(tag, h4)  do { } while (0)
+#endif
 
 static void h4_data_dump(const char *tag, uint8_t type, uint8_t *data, uint32_t len)
 {
@@ -282,7 +281,9 @@ static void h4_rx_thread(void *p1, void *p2, void *p3)
 	ARG_UNUSED(p2);
 	ARG_UNUSED(p3);
 
+#if PW_H4_TRACE
 	printf("[H4] rx thread started\n");
+#endif
 	pw_h4_whoami("h4_rx_thread", h4);
 	ssize_t frame_size = 0;
 
@@ -320,7 +321,9 @@ static void h4_rx_thread(void *p1, void *p2, void *p3)
 			}
 
 			LOG_ERR("Reading hci failed, errno %d", errno);
-			printf("[H4] rx read FAILED errno=%d -> close(fd %d) and exit thread\n", errno, h4->fd);
+#if PW_H4_TRACE
+			printf("[H4] rx read FAILED errno=%d -> close(fd %d)\n", errno, h4->fd);
+#endif
 			close(h4->fd);
 			h4->fd = -1;
 			return;
@@ -405,7 +408,9 @@ static int h4_hw_tx(struct h4_data *h4, struct net_buf *buf)
 	btsnoop_log_capture(0, buf->data, buf->len);
 
 	ret = h4_send_data(h4, buf->data, buf->len);
+#if PW_H4_TRACE
 	printf("[H4] h4_send_data -> %d (want %d, errno %d)\n", ret, len, errno);
+#endif
 
 	net_buf_unref(buf);
 	return ret == len ? 0 : -EINVAL;
@@ -469,7 +474,9 @@ static int h4_open(const struct device *dev, bt_hci_recv_t recv, void *hci_data)
 	}
 
 	h4->fd = ret;
+#if PW_H4_TRACE
 	printf("[H4] open %s -> fd %d\n", dev_name, h4->fd);
+#endif
 	pw_h4_whoami("h4_open", h4);
 
 	k_fifo_init(&h4->tx_fifo);
@@ -500,7 +507,9 @@ static int h4_open(const struct device *dev, bt_hci_recv_t recv, void *hci_data)
 	return 0;
 
 bail:
+#if PW_H4_TRACE
 	printf("[H4] open %s FAILED ret=%d errno=%d\n", dev_name, ret, errno);
+#endif
 	close(h4->fd);
 	h4->fd = -1;
 

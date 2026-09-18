@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 12:44:21",
- "generated_at_epoch": 1789706661,
+ "generated_at": "2026-09-18 13:02:36",
+ "generated_at_epoch": 1789707756,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 208,
-  "critical": 131,
-  "bytes": 9041344,
+  "files": 209,
+  "critical": 132,
+  "bytes": 9049265,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "7499c3fb8eda06bc94598f875b55c92d",
-   "size": 2806,
+   "md5": "c64a81fcff9e8a943bbf021c6058a605",
+   "size": 2822,
    "present": true
   },
   {
@@ -491,8 +491,19 @@
    "dst": "apps/examples/phywear/pw_bt.c",
    "compare": "exact",
    "critical": true,
-   "md5": "aa46bd5779d3bc38741d27b654eb7db2",
-   "size": 1444,
+   "md5": "e83f2b91d4c9f2afa2f31f09c39a05ec",
+   "size": 1407,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btgatt.c",
+   "dst": "apps/examples/phywear/pw_btgatt.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "3ac8664b03320c23e1737991ed2462e8",
+   "size": 8184,
    "present": true
   },
   {
@@ -865,8 +876,8 @@
    "dst": "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
    "compare": "exact",
    "critical": true,
-   "md5": "7293a47b07c8ed3ec5995e331b24ef74",
-   "size": 15294,
+   "md5": "7f54d518c225c9bcc48c3e0d2c8ccd4f",
+   "size": 14863,
    "present": true
   },
   {
@@ -1393,8 +1404,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "9cb69cf23ada3abb6013d12961c43fe7",
-   "size": 9279,
+   "md5": "06993ddef36a58066f5a29221ea12ca6",
+   "size": 9468,
    "present": true
   },
   {
