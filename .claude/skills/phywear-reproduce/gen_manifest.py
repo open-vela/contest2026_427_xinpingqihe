@@ -69,6 +69,12 @@ RULES = [
      "src/apps/external/zblue/zblue/port/drivers/bluetooth/hci/bt_snoop_stub.c",
      "apps/external/zblue/zblue/port/drivers/bluetooth/hci/bt_snoop_stub.c",
      "exact", True),
+    ("zblue-h4", "zblue H4 端口驱动（本队修复 B1：NuttX fd 表按 task_group 存放，"
+     "原实现从 Zephyr 系统工作队列线程 write(h4_open 打开的 fd) 必然 EBADF；"
+     "改为 h4_send 只入队、由与 open 同组的 rx 线程真正写 fd）",
+     "src/apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
+     "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
+     "exact", True),
     ("lcd-our", "板级 LCD 帧缓冲驱动改动（本队：防撕行等待实验开关，默认＝原行为）",
      "src/vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c",
      "vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c", "exact", True),

@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 12:09:03",
- "generated_at_epoch": 1789704543,
+ "generated_at": "2026-09-18 12:44:21",
+ "generated_at_epoch": 1789706661,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 203,
-  "critical": 126,
-  "bytes": 9001784,
+  "files": 208,
+  "critical": 131,
+  "bytes": 9041344,
   "missing_in_workspace": 0
  },
  "files": [
@@ -465,6 +465,39 @@
   {
    "rule": "app",
    "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_anim.c",
+   "dst": "apps/examples/phywear/pw_anim.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "7e383fba1fbf146a3c66c8714c03bf3c",
+   "size": 10730,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_anim.h",
+   "dst": "apps/examples/phywear/pw_anim.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "0de78ffc103e8702ed8f5bef6cf4414c",
+   "size": 4663,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_bt.c",
+   "dst": "apps/examples/phywear/pw_bt.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "aa46bd5779d3bc38741d27b654eb7db2",
+   "size": 1444,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
    "snap": "app/phywear/pw_btprobe.c",
    "dst": "apps/examples/phywear/pw_btprobe.c",
    "compare": "exact",
@@ -823,6 +856,17 @@
    "critical": true,
    "md5": "cdafaf6f515eb13c89d4eb1b6983c223",
    "size": 1203,
+   "present": true
+  },
+  {
+   "rule": "zblue-h4",
+   "rule_desc": "zblue H4 端口驱动（本队修复 B1：NuttX fd 表按 task_group 存放，原实现从 Zephyr 系统工作队列线程 write(h4_open 打开的 fd) 必然 EBADF；改为 h4_send 只入队、由与 open 同组的 rx 线程真正写 fd）",
+   "snap": "src/apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
+   "dst": "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "7293a47b07c8ed3ec5995e331b24ef74",
+   "size": 15294,
    "present": true
   },
   {
@@ -1224,6 +1268,17 @@
   {
    "rule": "tools",
    "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_serial.py",
+   "dst": "tools/phywear/pw_serial.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "ea103248ee58f2cda304815ebf078022",
+   "size": 6946,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
    "snap": "tools/pwshot.py",
    "dst": "tools/phywear/pwshot.py",
    "compare": "exact",
@@ -1338,8 +1393,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "5629b89d717349bd427bae72448540e5",
-   "size": 8796,
+   "md5": "9cb69cf23ada3abb6013d12961c43fe7",
+   "size": 9279,
    "present": true
   },
   {
