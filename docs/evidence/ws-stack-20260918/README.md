@@ -49,7 +49,7 @@ hpwork/lpwork 上跑的东西在本固件里是明确的（`grep work_queue(HPWO
 | GUI 主页截图 sha256 | 与金标 `e356689d…` **逐字节相同** | `accept-20260918-ppp2/shot/root.png` |
 | 同口径帧率（30 s 心跳） | loops/s 196，**fps 12 不变** | `accept-20260918-ppp2/R1_fps.log` |
 | 60 s 浸泡 | 无 panic / 断言 / 重启 | `accept-20260918-ppp2/R3_soak.log` |
-| **触摸屏 worker**（同一队列） | ✅ **人工确认通过**（2026-09-18 深夜，用户现场在屏上点按后答复"未发现异常"，同一 boot 心跳打到 `t=240s`、无 panic/断言/复位） | `HUMAN-touch-confirm.md`（含用户粘贴的串口原文） |
+| **触摸屏 worker**（同一队列） | ✅ **人工确认通过**（2026-09-18 深夜，用户现场点按后答复"**有反映啊**……其他无异常" —— 界面有反应说明 IRQ→hpwork→`ft6146_data_worker`→`touch_event` 这条链真的执行了；同一 boot 心跳打到 `t=240s`、无 panic/断言/复位） | `HUMAN-touch-confirm.md`（含用户粘贴的串口原文） |
 
 ⇒ **如实定性**：BT 数据面用自动负载压满验证；触摸这条**只能人工**（`ft6146_irq_handler()`
 是真 IRQ 里投 `work_queue(HPWORK, …)`，脚本造不出真实触摸），已由用户现场点按确认。
