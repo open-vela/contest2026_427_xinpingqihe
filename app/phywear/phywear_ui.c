@@ -1222,9 +1222,21 @@ static void btp_tick(lv_timer_t *t)
 
   btp_set_if_changed(g_btp_peer, buf);
 
-  snprintf(buf, sizeof(buf), "RX %u · TX %u · echo %u · MTU %u",
-           (unsigned)lk->rx, (unsigned)lk->tx,
-           (unsigned)lk->echo, (unsigned)lk->mtu);
+  /* 连接间隔一起显示：这是链路层优化的**现场证据** —— 请求 15~30 ms 之后
+   * 到底协商成多少，手表上直接能看见，不用回去翻串口日志。 */
+  if (lk->interval)
+    {
+      snprintf(buf, sizeof(buf), "RX %u · TX %u · echo %u · MTU %u · %.1f ms",
+               (unsigned)lk->rx, (unsigned)lk->tx, (unsigned)lk->echo,
+               (unsigned)lk->mtu, (double)lk->interval * 1.25);
+    }
+  else
+    {
+      snprintf(buf, sizeof(buf), "RX %u · TX %u · echo %u · MTU %u",
+               (unsigned)lk->rx, (unsigned)lk->tx, (unsigned)lk->echo,
+               (unsigned)lk->mtu);
+    }
+
   btp_set_if_changed(g_btp_stat, buf);
 
   /* 日志区：只在有新行时整体重画（seq 是单调递增的写入计数） */

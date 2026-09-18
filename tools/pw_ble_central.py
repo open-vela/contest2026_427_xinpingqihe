@@ -268,6 +268,94 @@ class Central:
                                         path=chr_path)
         return got
 
+    def perf(self, chr_path, n_lat=20, n_bulk=40, bulk_len=12, window=6.0):
+        """链路性能测量：**应用层往返延迟** + 定长载荷的**往返吞吐**。
+
+        为什么用"写一条文本 → 等设备把 echo 发回来"当尺子：
+        这是**端到端**的量（含 ATT 写、设备处理、通知回程），而且设备侧
+        `pw_text_write()` 是立刻回 echo 的 —— 中间没有人为延时，所以这条
+        往返时间基本就是「BLE 连接间隔 × 往返跳数」。连接间隔一变，它立刻跟着变，
+        正是我们做 A/B 要看的量。
+
+        返回 (rtts, bulk_ok, bulk_secs, err)：
+          rtts  : 每条往返耗时（秒），未收到为 None
+          bulk_ok / bulk_secs : window 秒内成功往返的条数与其用时
+        """
+        got = []
+        iface = dbus.Interface(self.bus.get_object(BLUEZ, chr_path),
+                               GATT_CHR_IFACE)
+
+        def on_props(interface, changed, invalidated):
+            if interface != GATT_CHR_IFACE:
+                return
+            if "Value" in changed:
+                got.append(bytes(bytearray(changed["Value"])))
+
+        self.bus.add_signal_receiver(
+            on_props, dbus_interface=PROPS_IFACE,
+            signal_name="PropertiesChanged", path=chr_path)
+
+        ctx = GLib.MainContext.default()
+
+        def drain(seconds):
+            """把已排队的 D-Bus 信号处理掉（非阻塞 iteration）。"""
+            t_end = time.time() + seconds
+            while time.time() < t_end:
+                while ctx.pending():
+                    ctx.iteration(False)
+                time.sleep(0.002)
+
+        rtts = []
+        try:
+            iface.StartNotify()
+            drain(1.2)                      # 等 CCC 写下去、链路稳一点
+
+            # ── 延迟：一条一条来，互不干扰 ──
+            for i in range(n_lat):
+                msg = ("p%03d" % i).encode()
+                want = b"echo: " + msg
+                got.clear()
+                t0 = time.time()
+                try:
+                    self.write(chr_path, msg)
+                except dbus.DBusException as e:
+                    return rtts, 0, 0.0, e.get_dbus_name()
+
+                while time.time() - t0 < 3.0:
+                    drain(0.05)
+                    if want in got:
+                        break
+                rtts.append((time.time() - t0) if want in got else None)
+
+            # ── 吞吐：连着灌 n_bulk 条定长文本，数回程 ──
+            # 定长是有意的：这样"往返条数/秒"可以直接换成 B/s 比较。
+            ok = 0
+            payload = ("x" * bulk_len).encode()
+            t0 = time.time()
+            while time.time() - t0 < window and ok < n_bulk:
+                got.clear()
+                self.write(chr_path, payload)
+                t1 = time.time()
+                while time.time() - t1 < 2.0:
+                    drain(0.05)
+                    if b"echo: " + payload in got:
+                        ok += 1
+                        break
+                else:
+                    break
+            bulk_secs = time.time() - t0
+        finally:
+            try:
+                iface.StopNotify()
+            except dbus.DBusException:
+                pass
+            self.bus.remove_signal_receiver(on_props,
+                                            dbus_interface=PROPS_IFACE,
+                                            signal_name="PropertiesChanged",
+                                            path=chr_path)
+
+        return rtts, ok, bulk_secs, None
+
     def text_roundtrip(self, chr_path, timeout):
         """文本特征（…a003）的双向连通性测试 —— 这就是"蓝牙串口"的判据。
 
@@ -334,7 +422,7 @@ class Central:
 
 
 def run_full_test(report, name="PhyWear", timeout=30.0, notify_count=2,
-                  text_test=False, disconnect_at_end=True):
+                  text_test=False, disconnect_at_end=True, perf=False):
     """跑完整测试序列，逐项通过 `report(label, ok, detail)` 回调。
 
     **为什么要把序列抽出来**：这条序列原本内联在 main() 里，只服务命令行。
@@ -436,6 +524,26 @@ def run_full_test(report, name="PhyWear", timeout=30.0, notify_count=2,
                 check("写文本后收到设备 echo（双向连通）", False,
                       e.get_dbus_name())
 
+    if perf:
+        text = chrs.get(TEXT_UUID)
+        if text:
+            rtts, ok, secs, perr = c.perf(text)
+            good = [r for r in rtts if r is not None]
+            if perr:
+                check("性能测量", False, perr)
+            elif not good:
+                check("性能测量", False, "一次往返都没测到")
+            else:
+                good.sort()
+                med = good[len(good) // 2]
+                check("往返延迟（中位/最小/最大）", True,
+                      f"{med*1000:.1f} / {good[0]*1000:.1f} / "
+                      f"{good[-1]*1000:.1f} ms（{len(good)}/{len(rtts)} 次成功）")
+                if secs > 0:
+                    check("定长往返吞吐", ok > 0,
+                          f"{ok} 条 / {secs:.2f} s = {ok/secs:.1f} 条/s"
+                          f"（每条 12 B 载荷）")
+
     # 收尾：主动断开。测完不断开的话，手表会一直显示"已连接"（而它是对的——
     # 链路真还在），并且不再广播，手机随后也连不上。见 Central.disconnect()。
     if disconnect_at_end:
@@ -453,6 +561,9 @@ def main():
     ap.add_argument("--text-test", action="store_true",
                     help="额外跑文本串口（…a003）的连通性测试："
                          "写一条带时间戳的文本，等设备把 echo 原样发回来")
+    ap.add_argument("--perf", action="store_true",
+                    help="链路性能测量：应用层往返延迟分布 + 定长载荷往返吞吐"
+                         "（做连接参数/MTU 的 A/B 用）")
     ap.add_argument("--keep-connected", action="store_true",
                     help="测完**不**断开（默认会主动断开，否则手表一直显示"
                          "已连接且不再广播）")
@@ -463,7 +574,7 @@ def main():
             f"{'PASS' if ok else 'FAIL'}  {label}  {detail}"),
         name=args.name, timeout=args.timeout,
         notify_count=args.notify_count, text_test=args.text_test,
-        disconnect_at_end=not args.keep_connected)
+        disconnect_at_end=not args.keep_connected, perf=args.perf)
 
     if not rows:
         return 2

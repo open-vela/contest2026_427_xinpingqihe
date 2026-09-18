@@ -50,7 +50,9 @@ struct pw_bt_link_s
 {
   volatile uint8_t  connected;      /* 1 = 有中心设备连着 */
   volatile uint8_t  subscribed;     /* 1 = 任一特征被订阅了通知 */
-  volatile uint16_t mtu;            /* 连接建立时的 ATT MTU（断开为 0） */
+  volatile uint16_t mtu;            /* **协商后**的 ATT MTU（由 att_mtu_updated 刷新；
+                                      * 不是连接瞬间那个默认值 23）；断开为 0 */
+  volatile uint16_t interval;       /* 协商后的连接间隔，单位 1.25 ms（断开为 0） */
   volatile uint32_t rx;             /* 手机写进来的文本条数 */
   volatile uint32_t tx;             /* 成功 notify 出去的文本条数 */
   volatile uint32_t echo;           /* 成功回给手机的 echo 条数 */

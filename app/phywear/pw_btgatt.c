@@ -98,11 +98,82 @@ static struct pw_bt_link_s  g_link;
 /* 手表 → 手机 的文本发送队列（只放一条，连点就 -EBUSY） */
 static struct k_work       g_text_work;
 static struct k_work       g_adv_work;      /* 断线后重开广播（见下） */
+static struct bt_conn     *g_conn;          /* 当前连接（只用来查实时参数） */
+
+/* 连接参数请求的总开关：**为了做同代码 A/B**（见下）。
+ * 实测结论（2026-09-18，BlueZ 当中心设备）：请求开与关，协商结果完全一样
+ * （itv=24 → 30.0 ms、lat=0、sto=400）⇒ **对 BlueZ 是 no-op**。
+ * 仍然默认打开：手机当中心设备时可能认这个请求，代价只是一个 L2CAP 信令包。 */
+#ifndef PW_BT_FAST_CONN
+#define PW_BT_FAST_CONN 1
+#endif
+
+/* 主动交换 ATT MTU 的开关（同样为了同代码 A/B）。
+ * 实测结论：BlueZ 自己也会把 MTU 拉到 517 —— 把这个宏关掉，读回来的
+ * 仍是 `mtu=517`（我一开始误以为是自己的交换起作用了）。保持打开是因为
+ * 其它中心设备（手机）不一定主动交换。 */
+#ifndef PW_BT_MTU_EXCH
+#define PW_BT_MTU_EXCH 1
+#endif
 static void pw_adv_restart(struct k_work *work);
+static void pw_bt_log(uint8_t dir, FAR const char *text);
 static char                g_text_out[PW_BT_TEXT_MAX + 1];
 static uint8_t             g_text_pending;
 
 #define PW_SAMPLE_MS   500
+
+/* ── 链路层优化：连接参数 + ATT MTU（2026-09-18 深夜）────────────────────
+ *
+ * 背景（有实测基线，不是拍脑袋）：默认参数下，宿主侧量到的应用层
+ * "写一条文本→收回 echo" 往返是 **中位 135.0 ms / 最小 109.4 / 最大 178.9**，
+ * 定长往返吞吐 **7.3 条/s**（12 B 载荷）；而设备页面上显示的 `MTU 23`
+ * 其实是**连接瞬间的快照**，并不是协商后的真实值。
+ *
+ * 两件事：
+ *   ① 连接后**主动请求**更短的连接间隔（15~30 ms、slave latency 0）；
+ *      BLE 规范最小间隔是 12×1.25 ms = 15 ms，我们把下限就设在这儿。
+ *   ② 注册 ATT MTU 更新回调，把**真实协商值**记下来并显示 —— 顺带修掉
+ *      "页面一直显示 MTU 23"这个显示错误。同时主动发起一次 MTU 交换，
+ *      把上限拉高（默认 23 时一次写只能带 20 B 载荷，做字节管道/PPP 会很痛苦）。
+ *
+ * 注意：连接参数最终由**中心设备**决定（我们这边只是发 L2CAP 参数更新请求），
+ * 所以协商结果要从 `le_param_updated` 读出来，**不能假定请求被接受**。
+ */
+static const struct bt_le_conn_param pw_conn_param =
+{
+  .interval_min = 12,   /* 12 × 1.25 ms = 15 ms（规范下限） */
+  .interval_max = 24,   /* 24 × 1.25 ms = 30 ms */
+  .latency = 0,         /* 每个连接事件都听主设备：延迟优先 */
+  .timeout = 400,       /* 400 × 10 ms = 4 s 监督超时 */
+};
+
+static void pw_att_mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
+{
+  (void)conn;
+  g_link.mtu = tx;
+  printf("[bt] mtu updated tx=%u rx=%u\n", (unsigned)tx, (unsigned)rx);
+  pw_bt_log(PW_BT_DIR_SYS, "mtu updated");
+}
+
+static struct bt_gatt_cb pw_gatt_cb =
+{
+  .att_mtu_updated = pw_att_mtu_updated,
+};
+
+/* MTU 交换的应答回调。这里**只打结果**：真正要用的 MTU 值统一由
+ * `att_mtu_updated` 落到 g_link.mtu —— 两个来源都写同一处容易打架。 */
+static void pw_mtu_exchanged(struct bt_conn *conn, uint8_t err,
+                             struct bt_gatt_exchange_params *params)
+{
+  (void)conn;
+  (void)params;
+  printf("[bt] exchange mtu done err=%u\n", err);
+}
+
+static struct bt_gatt_exchange_params pw_mtu_params =
+{
+  .func = pw_mtu_exchanged,
+};
 
 /* ── 链路状态 / 文本日志（BT 线程写，UI 线程读）──────────────────────── */
 
@@ -291,11 +362,34 @@ static ssize_t pw_text_read(struct bt_conn *conn,
   char st[80];
   int n;
 
+  /* 连接参数从**实时**查询拿（bt_conn_get_info），而不是只依赖
+   * le_param_updated 回调 —— 实测那个回调在本链路（中心设备是 BlueZ）上
+   * 一次都没触发过，只靠它就会永远不知道真实间隔是多少。
+   * 放"读"里是有意的：宿主读一次 …a003 就能拿到当下的真实参数，
+   * A/B 比较时不用回去翻串口日志。 */
+  uint16_t itv = 0;
+  uint16_t lat = 0;
+  uint16_t sto = 0;
+
+  if (g_conn != NULL)
+    {
+      struct bt_conn_info ci;
+
+      if (bt_conn_get_info(g_conn, &ci) == 0)
+        {
+          itv = ci.le.interval;
+          lat = ci.le.latency;
+          sto = ci.le.timeout;
+        }
+    }
+
   n = snprintf(st, sizeof(st),
-               "PhyWear bt conn=%u sub=%u rx=%u tx=%u echo=%u mtu=%u",
+               "PhyWear bt conn=%u sub=%u rx=%u tx=%u echo=%u mtu=%u "
+               "itv=%u lat=%u sto=%u",
                (unsigned)g_link.connected, (unsigned)g_link.subscribed,
                (unsigned)g_link.rx, (unsigned)g_link.tx,
-               (unsigned)g_link.echo, (unsigned)g_link.mtu);
+               (unsigned)g_link.echo, (unsigned)g_link.mtu,
+               (unsigned)itv, (unsigned)lat, (unsigned)sto);
 
   return bt_gatt_attr_read(conn, attr, buf, len, offset, st, (uint16_t)n);
 }
@@ -495,6 +589,21 @@ static void pw_sample_work_handler(struct k_work *work)
 {
   (void)work;
 
+  /* 顺便把**实时**连接参数缓存下来给界面用。
+   * 为什么不在 UI 线程里查：那是 GUI 线程，不能去碰 BT 栈（跨线程）。
+   * 为什么不在连接时查一次就算：实测 `le_param_updated` 回调在本链路
+   * （中心设备是 BlueZ）**一次都没触发过**，只靠它界面就永远显示不出间隔。
+   * 这里跑在 BT 工作队列上，每 500 ms 查一次，代价可以忽略。 */
+  if (g_conn != NULL)
+    {
+      struct bt_conn_info ci;
+
+      if (bt_conn_get_info(g_conn, &ci) == 0)
+        {
+          g_link.interval = ci.le.interval;
+        }
+    }
+
   /* 没有订阅者就不采样 —— 别为了没人看的数据每 500 ms 去开一次 /dev 传感器。
    * 有人读时会由 pw_read_sensor() 现采。 */
   if (g_nfy_on)
@@ -537,6 +646,7 @@ static void pw_sample_work_handler(struct k_work *work)
 static void pw_connected(struct bt_conn *conn, uint8_t err)
 {
   char addr[BT_ADDR_LE_STR_LEN];
+  int rc;
 
   bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
   printf("[bt] B3 connected: %s err=%u\n", addr, err);
@@ -545,6 +655,7 @@ static void pw_connected(struct bt_conn *conn, uint8_t err)
 
   if (err == 0)
     {
+      g_conn = conn;
       g_link.connected = 1;
       g_link.subscribed = 0;
       g_link.mtu = bt_gatt_get_mtu(conn);
@@ -552,6 +663,19 @@ static void pw_connected(struct bt_conn *conn, uint8_t err)
       g_link.peer[sizeof(g_link.peer) - 1] = '\0';
       pw_bt_log(PW_BT_DIR_SYS, addr);
       printf("[bt] link up mtu=%u\n", (unsigned)g_link.mtu);
+
+#if PW_BT_FAST_CONN
+      /* 请求更短的连接间隔（结果由中心设备决定，见 le_param_updated） */
+      rc = bt_conn_le_param_update(conn, &pw_conn_param);
+      printf("[bt] conn param update req rc=%d (interval %u~%u x1.25ms)\n", rc,
+             pw_conn_param.interval_min, pw_conn_param.interval_max);
+#endif
+
+#if PW_BT_MTU_EXCH
+      /* 主动拉高 ATT MTU：默认 23 时一次写只能带 20 B 载荷 */
+      rc = bt_gatt_exchange_mtu(conn, &pw_mtu_params);
+      printf("[bt] exchange mtu rc=%d\n", rc);
+#endif
     }
 }
 
@@ -564,9 +688,11 @@ static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
   g_nfy_on = 0;
   g_text_sub = 0;
 
+  g_conn = NULL;
   g_link.connected = 0;
   g_link.subscribed = 0;
   g_link.mtu = 0;
+  g_link.interval = 0;
   g_link.peer[0] = '\0';
   g_text_pending = 0;
   pw_bt_log(PW_BT_DIR_SYS, "disconnected");
@@ -575,10 +701,23 @@ static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
   k_work_submit(&g_adv_work);
 }
 
+/* 协商后的连接参数：打印 + 记进链路状态（手表页面上要看得到） */
+static void pw_le_param_updated(struct bt_conn *conn, uint16_t interval,
+                                uint16_t latency, uint16_t timeout)
+{
+  (void)conn;
+  g_link.interval = interval;
+  printf("[bt] le param updated interval=%u (%.1f ms) latency=%u timeout=%u\n",
+         (unsigned)interval, (double)interval * 1.25, (unsigned)latency,
+         (unsigned)timeout);
+  pw_bt_log(PW_BT_DIR_SYS, "conn param updated");
+}
+
 static struct bt_conn_cb pw_conn_cb =
 {
   .connected = pw_connected,
   .disconnected = pw_disconnected,
+  .le_param_updated = pw_le_param_updated,
 };
 
 /* ── 广播数据 ───────────────────────────────────────────────────────── */
@@ -862,6 +1001,7 @@ int pw_btgatt_start(void)
   pw_bt_log_reset();
   k_work_init(&g_text_work, pw_text_work_handler);
   k_work_init(&g_adv_work, pw_adv_restart);
+  bt_gatt_cb_register(&pw_gatt_cb);
 
   rc = bt_gatt_service_register(&pw_svc);
   printf("[bt] B2 gatt register rc=%d %s\n", rc, rc == 0 ? "(ok)" : "(FAILED)");

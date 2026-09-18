@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 19:49:16",
- "generated_at_epoch": 1789732156,
+ "generated_at": "2026-09-18 21:18:14",
+ "generated_at_epoch": 1789737494,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 222,
-  "critical": 145,
-  "bytes": 8992088,
+  "files": 223,
+  "critical": 146,
+  "bytes": 9004692,
   "missing_in_workspace": 0
  },
  "files": [
@@ -370,8 +370,8 @@
    "dst": "apps/examples/phywear/phywear_ui.c",
    "compare": "exact",
    "critical": true,
-   "md5": "70c44adb0b2a207201484317ae9508f9",
-   "size": 54462,
+   "md5": "80c380d3f54c2c2c747fb561d30ca5fb",
+   "size": 54937,
    "present": true
   },
   {
@@ -513,8 +513,8 @@
    "dst": "apps/examples/phywear/pw_btgatt.c",
    "compare": "exact",
    "critical": true,
-   "md5": "740a34f9e2f8d5ceec8288f84424ddc2",
-   "size": 34498,
+   "md5": "3cd755a69f80131459f16727f0a5eb88",
+   "size": 40421,
    "present": true
   },
   {
@@ -524,8 +524,8 @@
    "dst": "apps/examples/phywear/pw_btgatt.h",
    "compare": "exact",
    "critical": true,
-   "md5": "59c4418a6b0cb0a639aa8caa95767907",
-   "size": 3950,
+   "md5": "17b78307e6b8c5085317558317d9c125",
+   "size": 4158,
    "present": true
   },
   {
@@ -1360,8 +1360,8 @@
    "dst": "tools/phywear/pw_ble_central.py",
    "compare": "exact",
    "critical": true,
-   "md5": "8f1f9c2638341cb41a0d137a2c3bb56f",
-   "size": 20709,
+   "md5": "6698fb0c7ee2e35b8e58ff2cbedb20e3",
+   "size": 25430,
    "present": true
   },
   {
@@ -1395,6 +1395,17 @@
    "critical": true,
    "md5": "985b43b5b81f773c864a01f9cf86f503",
    "size": 5093,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_hold_conn.py",
+   "dst": "tools/phywear/pw_hold_conn.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "ff26aace0a6893a68b31cc0435a7c7a7",
+   "size": 1277,
    "present": true
   },
   {
