@@ -36,6 +36,8 @@ from pw_serial import Session, dump, log  # noqa: E402
 CHECKS = [
     ("adv_started", "广播启动 rc=0", r"\[bt\] B2 adv start rc=0",
      "设备没在广播 —— 检查 phywear cap bt 的输出"),
+    ("selftest", "服务端自检 PASS", r"\[bt\] SELFTEST PASS",
+     "设备侧 GATT 数据库/读写路径就没过 —— 先修这个，别怀疑手机（看 SELFTEST 明细）"),
     ("connected", "手机已连接", r"\[bt\] B3 connected: .* err=0",
      "手机没连上 —— 按名字找 PhyWear；本板广播用随机地址，按 MAC 找不到"),
     ("notify_on", "手机订阅 Notify", r"\[bt\] ccc changed -> notify ON",
@@ -48,10 +50,22 @@ CHECKS = [
 
 
 def evaluate(text):
+    """判定。
+
+    ⚠️ 关键：订阅(ccc)与写入(cmd #)这两项**必须在"已连接"之后**才算数 ——
+    否则设备侧自检自己写的那条命令会被误判成"手机写进来了"（这个假 PASS
+    在本轮真的发生过，已修：自检改用 selftest 命令名 + 这里限定区间）。
+    """
+    m = None
+    for m in re.finditer(r"\[bt\] B3 connected: .* err=0", text):
+        pass
+    after_conn = text[m.end():] if m else ""
+
     rows = []
     ok_all = True
     for name, label, pattern, hint, *negate in CHECKS:
-        hit = re.search(pattern, text) is not None
+        scope = after_conn if name in ("notify_on", "cmd_in") else text
+        hit = re.search(pattern, scope) is not None
         good = (not hit) if negate else hit
         rows.append((name, label, good, hint))
         if not good:

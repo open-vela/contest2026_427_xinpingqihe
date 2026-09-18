@@ -68,10 +68,19 @@ static struct k_work_delayable g_sample_work;
 
 /* ── GATT 回调 ──────────────────────────────────────────────────────── */
 
+static void pw_sample_once(void);
+
+/* 读的时候**现采一次**：手机点一下"读"就应拿到当下这一秒的值，
+ * 而不是上一轮 notify 的旧值。（采样最坏 ~150 ms，读是用户触发的，可接受。） */
 static ssize_t pw_read_sensor(struct bt_conn *conn,
                               const struct bt_gatt_attr *attr, void *buf,
                               uint16_t len, uint16_t offset)
 {
+  if (offset == 0)
+    {
+      pw_sample_once();
+    }
+
   return bt_gatt_attr_read(conn, attr, buf, len, offset, &g_pkt,
                            sizeof(g_pkt));
 }
@@ -114,6 +123,10 @@ static ssize_t pw_write_cmd(struct bt_conn *conn,
   else if (strcmp(g_last_cmd, "ping") == 0)
     {
       printf("[bt] cmd: pong\n");
+    }
+  else if (strcmp(g_last_cmd, "selftest") == 0)
+    {
+      printf("[bt] cmd: selftest ok (设备侧自检，非手机写入)\n");
     }
 
   return len;
@@ -217,7 +230,12 @@ static void pw_sample_work_handler(struct k_work *work)
 {
   (void)work;
 
-  pw_sample_once();
+  /* 没有订阅者就不采样 —— 别为了没人看的数据每 500 ms 去开一次 /dev 传感器。
+   * 有人读时会由 pw_read_sensor() 现采。 */
+  if (g_nfy_on)
+    {
+      pw_sample_once();
+    }
 
   if (g_nfy_on)
     {
@@ -351,11 +369,13 @@ static int pw_btgatt_selftest(void)
       fails++;
     }
 
-  /* ③ 写路径：等价于手机往命令特征写 "ping" */
-  printf("[bt] SELFTEST write cmd \"ping\" ->\n");
-  n = pw_write_cmd(NULL, &pw_attrs[5], "ping", 4, 0, 0);
-  printf("[bt] SELFTEST write ret=%d (want 4)\n", (int)n);
-  if (n != 4 || g_cmd_count == 0)
+  /* ③ 写路径：等价于手机往命令特征写一条命令。
+   * 用 "selftest" 这个**专用**命令名，避免与人工手机写入（比如 "ping"）混淆 ——
+   * B3 判定器就是靠区分这两者才不会误判"手机写进来了"。 */
+  printf("[bt] SELFTEST write cmd \"selftest\" ->\n");
+  n = pw_write_cmd(NULL, &pw_attrs[5], "selftest", 8, 0, 0);
+  printf("[bt] SELFTEST write ret=%d (want 8)\n", (int)n);
+  if (n != 8 || g_cmd_count == 0)
     {
       fails++;
     }
