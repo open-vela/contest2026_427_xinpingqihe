@@ -824,6 +824,24 @@ static void pw_adv_restart(struct k_work *work)
 
   rc = bt_le_adv_start(BT_LE_ADV_CONN, pw_ad, ARRAY_SIZE(pw_ad), pw_sd,
                        ARRAY_SIZE(pw_sd));
+
+  /* 实测（2026-09-18）：断开之后直接 start 会回 **-114 = -EALREADY** ——
+   * 因为链路建立时控制器**自己**把 legacy 广播停了，而 host 侧的
+   * `BT_ADV_ENABLED` 标志位**没有被清掉**（`adv.c` 在 BT_ADV_ENABLED 置位时
+   * 直接 return -EALREADY）。这也正是内置的 `bt_le_adv_resume()` 永远不生效的
+   * 原因：它的前置条件是 `BT_ADV_PERSIST && !BT_ADV_ENABLED`，第二个条件
+   * 一直为假 ⇒ **断开后设备再也不会广播**（用户想重连时搜不到）。
+   * 修法：遇到 EALREADY 先 stop（把标志位清干净，控制器会接受一次冗余的
+   * "关闭广播"命令）再 start。两个 rc 都打出来，下次一眼能看出状态机对不对。 */
+  if (rc == -EALREADY)
+    {
+      int src = bt_le_adv_stop();
+
+      printf("[bt] adv busy(EALREADY), stop rc=%d, retry start\n", src);
+      rc = bt_le_adv_start(BT_LE_ADV_CONN, pw_ad, ARRAY_SIZE(pw_ad), pw_sd,
+                           ARRAY_SIZE(pw_sd));
+    }
+
   printf("[bt] adv restart rc=%d %s\n", rc, rc == 0 ? "(ok)" : "(FAILED)");
 
   if (rc == 0)
