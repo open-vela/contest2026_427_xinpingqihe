@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 23:00:05",
- "generated_at_epoch": 1789743605,
+ "generated_at": "2026-09-18 23:03:21",
+ "generated_at_epoch": 1789743801,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 226,
-  "critical": 149,
-  "bytes": 9055195,
+  "files": 228,
+  "critical": 151,
+  "bytes": 9072094,
   "missing_in_workspace": 0
  },
  "files": [
@@ -1422,6 +1422,17 @@
   {
    "rule": "tools",
    "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_bt_ppp_e2e.py",
+   "dst": "tools/phywear/pw_bt_ppp_e2e.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "8b54982e4bf7ae604255b8ff4f59c0dd",
+   "size": 6613,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
    "snap": "tools/pw_h4_notify_decode.py",
    "dst": "tools/phywear/pw_h4_notify_decode.py",
    "compare": "exact",
@@ -1450,6 +1461,17 @@
    "critical": true,
    "md5": "2471e540580be4cd972ec43724fac186",
    "size": 2290,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_ppp_frame.py",
+   "dst": "tools/phywear/pw_ppp_frame.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "72289e80100b7fd099404e6673279500",
+   "size": 10286,
    "present": true
   },
   {
