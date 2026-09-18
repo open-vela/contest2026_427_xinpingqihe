@@ -79,6 +79,7 @@
 #include "pw_net.h"
 #include "pw_bt.h"
 #include "pw_btgatt.h"
+#include "pw_btppp.h"
 #if defined(CONFIG_LV_USE_DEMO_BENCHMARK)
 #  include <demos/benchmark/lv_demo_benchmark.h>
 #endif
@@ -1019,6 +1020,16 @@ int main(int argc, FAR char *argv[])
   if (argc > 1 && strcmp(argv[1], "net") == 0)
     {
       pw_net_up();
+      return 0;
+    }
+
+  /* 任务 3 的第二条替代通路：**PPP over BLE**（见 pw_btppp.c）。
+   * 与 `net` 一样是"做完就退"，不进 GUI —— 这条链路要长期挂着跑 pppd，
+   * 再拉一个 GUI 只会白占内存（本板 SRAM 已 96%）。 */
+  if (argc > 1 && strcmp(argv[1], "btppp") == 0)
+    {
+      pw_bt_init();
+      pw_btppp_start();
       return 0;
     }
 

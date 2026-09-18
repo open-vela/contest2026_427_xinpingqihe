@@ -324,3 +324,22 @@ CONFIG_SYSTEM_POPEN=y
 # CONFIG_AI_AGENT_BLE_NET is not set
 # CONFIG_AI_AGENT_LVGL_UI is not set
 # CONFIG_AI_AGENT_TEST is not set
+
+# Task 3 fallback: PPP over BLE (2026-09-18).
+# The board has no WiFi NIC and the USB data cable cannot be attached, so BLE
+# is the only physical channel left. NuttX ships pppd; the host already has
+# pppd; what was missing is a BLE<->pty byte pipe (see pw_btppp.c).
+# NOTE: keep this file ASCII-only -- non-ASCII bytes here break
+# nuttx_export_kconfig_by_value() with "string sub-command REGEX, mode MATCH
+# needs at least 5 arguments" (docs/07 pitfall 35).
+# DISABLED by default (2026-09-18): the feature itself works (pty + GATT byte
+# pipe + pppd all start -- see docs/evidence/bt-ppp-20260918/), but NuttX pppd
+# needs a ~16 KB stack and this board only has ~4-5 KB of SRAM headroom
+# (boot dies above ~96.8% SRAM usage). Keep these off so the ship firmware
+# pays nothing; to re-enable, uncomment these five lines AND set
+# PW_BT_PPP=1 in apps/examples/phywear/pw_btppp.c, then free ~13 KB of SRAM.
+# CONFIG_PSEUDOTERM=y
+# CONFIG_PSEUDOTERM_SUSV1=y
+# CONFIG_PSEUDOTERM_TXBUFSIZE=512
+# CONFIG_PSEUDOTERM_RXBUFSIZE=512
+# CONFIG_NETUTILS_PPPD=y

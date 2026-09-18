@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 21:18:14",
- "generated_at_epoch": 1789737494,
+ "generated_at": "2026-09-18 22:10:51",
+ "generated_at_epoch": 1789740651,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 223,
-  "critical": 146,
-  "bytes": 9004692,
+  "files": 226,
+  "critical": 149,
+  "bytes": 9028812,
   "missing_in_workspace": 0
  },
  "files": [
@@ -18,8 +18,8 @@
    "dst": "apps/examples/phywear/CMakeLists.txt",
    "compare": "exact",
    "critical": true,
-   "md5": "cdbc3eff5d16388ccd85b714e3b3d9f9",
-   "size": 2835,
+   "md5": "b75911e39e4176703972f91d211f703f",
+   "size": 2850,
    "present": true
   },
   {
@@ -62,8 +62,8 @@
    "dst": "apps/examples/phywear/phywear.c",
    "compare": "exact",
    "critical": true,
-   "md5": "b3827f424a1a05c25283b1c65279538a",
-   "size": 67593,
+   "md5": "b6f42670b3aacadd4a53c7dba67da2f1",
+   "size": 67988,
    "present": true
   },
   {
@@ -526,6 +526,28 @@
    "critical": true,
    "md5": "17b78307e6b8c5085317558317d9c125",
    "size": 4158,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btppp.c",
+   "dst": "apps/examples/phywear/pw_btppp.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "d57d63b4c0a3bae48943314d1675d219",
+   "size": 15326,
+   "present": true
+  },
+  {
+   "rule": "app",
+   "rule_desc": "PhyWear 应用源码（本队原创，LVGL 手表端）",
+   "snap": "app/phywear/pw_btppp.h",
+   "dst": "apps/examples/phywear/pw_btppp.h",
+   "compare": "exact",
+   "critical": true,
+   "md5": "591b63f03464e910e0a407d12c4ecb31",
+   "size": 1040,
    "present": true
   },
   {
@@ -1389,6 +1411,17 @@
   {
    "rule": "tools",
    "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_bt_ppp.py",
+   "dst": "tools/phywear/pw_bt_ppp.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "8cf7ddc45f35bccb421b17585eb9e2e0",
+   "size": 6293,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
    "snap": "tools/pw_h4_notify_decode.py",
    "dst": "tools/phywear/pw_h4_notify_decode.py",
    "compare": "exact",
@@ -1558,8 +1591,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "a7768500e0caadd049adb532d500e246",
-   "size": 9696,
+   "md5": "9cc3b07efcb9899d344485368e815bbd",
+   "size": 10747,
    "present": true
   },
   {
