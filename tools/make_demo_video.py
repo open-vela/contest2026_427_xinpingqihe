@@ -53,24 +53,48 @@ FPS_DEFAULT = 25
 HEADER_H = 76
 FOOTER_Y = 600
 CONTENT_TOP = HEADER_H + 8          # 84
-CONTENT_BOT = FOOTER_Y - 4          # 596
+# 底部字幕条：高度与它占据的正文下界都从这里算。
+# 为什么改常量而不是逐个 layout 打补丁：**所有 layout 都拿 CONTENT_BOT 当下界**，
+# 且越界会直接报错 —— 抬高它，字幕条的实位就对全部版式生效。
+# （第一版直接在 596 附近画字幕，把带 notes 的 wide 版式最后一行压住了。）
+SUB_H = 40                          # 字幕条高度（含与正文的 4 px 间隙）
+CONTENT_BOT = FOOTER_Y - 4 - SUB_H  # 556
 
 # 分段时长（秒）——严格对齐 docs/08 v4 的时间轴总览（合计 4:55 = 295 s，硬上限 300 s）
 SEG_PLAN = [
     ("片头", 8),
     ("第 1 段", 20),
-    ("第 2 段", 37),
+    ("第 2 段", 30),
     ("第 3 段", 30),
-    ("第 4 段", 30),
+    ("第 4 段", 15),          # 原 30：删掉「模拟器对照帧」15 s（演示价值低）
     ("第 5 段", 35),
     ("第 6 段", 45),
-    ("第 7 段", 35),
+    ("第 7 段", 27),          # 原 35：删掉「模拟器对照」8 s
     ("第 8 段", 25),
-    ("第 9 段", 30),
+    ("第 9 段", 49),          # 原 30：蓝牙打通 29 s（本轮最大增量）+ 限制 10 + 片尾 10
 ]
 TOTAL_SECS = sum(s for _, s in SEG_PLAN)
 
+# 每段底部字幕（成片的主要信息通道 —— 本片无音轨，靠字幕讲清楚）。
+# 文案取自 docs/08_演示视频拍摄脚本.md 的「字幕」行，**已按最新事实更新**
+# （原 v4 脚本里"蓝牙 no-go"等结论已作废，见 docs/16）。
+SEG_SUB = {
+    "片头": "PhyWear · 腕上智慧物理工坊 · 立创黄山派 SF32LB52 · 2026 openvela AI 硬件大赛",
+    "第 1 段": "玩法来源：phyphox（致谢/GPL）· 实现：C + LVGL 重写（Apache-2.0）",
+    "第 2 段": "真机实拍（静态帧）· 全中文 · 6 页原始传感器 · ai_agent 开机自启",
+    "第 3 段": "轻点切换数值/图线 · 每轴独立量程（Y 轴幅度 3px → 16px）",
+    "第 4 段": "指针盘（不用 lv_arc）· 秒表环形进度（fps 10→9，如实）",
+    "第 5 段": "真机实测：摆测 g 偏差 ≈1.8%（无转台真值）",
+    "第 6 段": "晃表 → 自动跑实验 → 结果上手表 · 修掉两个真崩溃",
+    "第 7 段": "自写 Mahony MARG · 与加速度计独立解算一致 ~0.5% · 开磁后 yaw 不漂",
+    "第 8 段": "EPIC=官方成果，本队集成 · 启动 5/5 · 泡机 0 复位",
+    "第 9 段": "蓝牙 B1/B2/B3 全部打通 · 两个根因都定位到代码行 · 限制如实列出",
+}
+
 MAX_SECS = 300                      # 交付硬上限：≤5 分钟
+KB_ZOOM = 1.045                     # 单张分镜的推近幅度（整帧缩放，见帧循环注释）
+KB_STEPS = 12                       # 入场推拉的量化步数（见帧循环注释）
+KB_IN_MS = 500                      # 每张分镜的入场运动时长（毫秒），其余时间静止
 
 # ---------------------------------------------------------------- 颜色
 
@@ -90,12 +114,12 @@ KIND = {
     "sim":   ("模拟器截图",      (104, 56, 16), (255, 170, 80)),
     "log":   ("串口日志·非画面",  (30, 54, 92),  (126, 188, 255)),
     "mixed": ("真机 + 串口日志",  (52, 42, 92),  (176, 156, 255)),
-    "v01":   ("v0.1 静态素材版",  (96, 28, 40),  (255, 132, 142)),
+    "v01":   ("v1 成片 · 无实拍动态", (96, 28, 40), (255, 132, 142)),
     "concl": ("结论 · 非画面",    (30, 54, 92),  (126, 188, 255)),
 }
 
-FOOTER_L1 = ("v0.1 静态素材版 · 全部画面为已有真机/模拟器截图与串口日志文字卡"
-             "（非实拍动态画面）· 真机动态画面待实拍 · 无音轨")
+FOOTER_L1 = ("v1 成片 · 画面来源：真机截图 / 真机采集数据 / 宿主实录；"
+             "推拉与字幕为后制，真机无视频输出故无实拍动态画面")
 
 # ---------------------------------------------------------------- 字体
 
@@ -214,6 +238,11 @@ S = "docs/evidence"
 
 # 素材清单：所有在 slides 里出现的路径都必须在这里，缺失即报错。
 ASSETS = [
+    # 蓝牙（2026-09-18 新增：连接标识 / 手表版串口页 / 桌面测试 GUI）
+    f"{S}/btui-20260918/root_not_connected.png",
+    f"{S}/btui-20260918/root_connected.png",
+    f"{S}/btui-20260918/btlink_connected.png",
+    f"{S}/bt-gui-20260918/gui_real_run_2.png",
     f"{S}/ui-batch2-20260915/rev-real-home.png",
     f"{S}/ui-batch2-20260915/rev-real-raw-num.png",
     f"{S}/ui-batch2-20260915/rev-real-raw-curve.png",
@@ -256,9 +285,9 @@ SLIDES = [
          lines=[
              "立创黄山派 SF32LB52 · 2026 openvela AI 硬件大赛",
              "",
-             "⚠ 本片是 v0.1 静态素材版（样片），不是实拍演示：",
-             "   全部画面来自 · 真机截图 · 模拟器截图 · 串口日志文字卡",
-             "   片内无任何实拍动态画面，也无音轨（真人讲稿录音待补）",
+             "⚠ 本片不是实拍演示（真机无视频输出）：",
+             "   画面来自 · 真机截图 · 真机采集数据 · 宿主实录",
+             "   动态为后制推拉，无音轨（信息全部走底部字幕）",
          ],
          notes=[]),
 
@@ -280,7 +309,7 @@ SLIDES = [
          ]),
 
     # ---------------- 第 2 段 ----------------
-    dict(seg="第 2 段", num="2 / 10", secs=13, layout="watch", kind="real",
+    dict(seg="第 2 段", num="2 / 10", secs=10, layout="watch", kind="real",
          title="真机开机 · 全中文界面",
          images=[f"{S}/realboard-20260912/00_主页面总览.png"],
          caption="真机截图 00_主页面总览.png（主页与各页拼图）",
@@ -305,7 +334,7 @@ SLIDES = [
              "素材：真机截图 docs/evidence/ui-batch2-20260915/",
          ]),
 
-    dict(seg="第 2 段", num="2 / 10", secs=12, layout="watch2", kind="real",
+    dict(seg="第 2 段", num="2 / 10", secs=8, layout="watch2", kind="real",
          title="声学：2 个可用 + 2 个规划",
          images=[f"{S}/acoustic-20260913/tone.png", f"{S}/acoustic-20260913/mic.png"],
          caption="真机截图 acoustic-20260913/{tone,mic}.png",
@@ -366,23 +395,8 @@ SLIDES = [
              "秒表页有 1 帧代价 fps 10 → 9（如实说明）",
          ]),
 
-    dict(seg="第 4 段", num="4 / 10", secs=15, layout="watch2", kind="sim",
-         title="同两页 · 模拟器对照帧",
-         images=[f"{S}/ui-batch2-20260915/sim-incline-dial.png",
-                 f"{S}/ui-batch2-20260915/sim-stopwatch-ring.png"],
-         caption="模拟器截图 sim-incline-dial.png / sim-stopwatch-ring.png",
-         lines=[
-             "⚠ 本帧两张图均为模拟器截图",
-             "（goldfish arm64 模拟器，非真机）",
-             "",
-             "用来说明「倾斜表身 → 刻度点亮」与环形进度的外观",
-         ],
-         notes=[
-             "真机同两页见前一帧；模拟器数据 ≠ 真机测量",
-         ]),
-
-    # ---------------- 第 5 段 ----------------
-    dict(seg="第 5 段", num="5 / 10", secs=18, layout="watch", kind="real",
+        # ---------------- 第 5 段 ----------------
+dict(seg="第 5 段", num="5 / 10", secs=18, layout="watch", kind="real",
          title="单摆测 g",
          images=[f"{S}/realboard-20260912/02_pendulum.png"],
          caption="真机截图 realboard-20260912/02_pendulum.png",
@@ -450,9 +464,8 @@ SLIDES = [
              "Agent 只「开页 → 等结果 → 读结果」",
          ],
          notes=[
-             "09-13 的「十几秒整机卡住」根因就是 Agent 自己也在 50 Hz 采 IMU，已修掉",
-             "同时修掉两个真崩溃：velaclaw_ask 未初始化断言、工具 cJSON 双重释放",
-             "振幅为变量，脚本与日志以 x.xx 记；此处不编造具体数值",
+             "卡里振幅写作 x.xx：脚本与日志就是变量，此处不编造具体数值",
+             "顺带修掉两个真崩溃：velaclaw_ask 未初始化断言、工具 cJSON 双重释放",
          ]),
 
     dict(seg="第 6 段", num="6 / 10", secs=15, layout="log", kind="log",
@@ -527,19 +540,6 @@ SLIDES = [
              "重力六面法：零偏 +0.020/−0.015/+0.030 g，系数 0.980/1.020/0.990",
          ]),
 
-    dict(seg="第 7 段", num="7 / 10", secs=8, layout="wide", kind="sim",
-         title="同三条标定链路（模拟器 [BENCH]）",
-         images=[f"{S}/imu-ui-20260915/sim-bench-three.png"],
-         caption="模拟器截图 imu-ui-20260915/sim-bench-three.png",
-         lines=[
-             "⚠ 本帧为模拟器截图（goldfish arm64），标题同样带 [BENCH]",
-             "模拟器注入同一组真值走完三条链路；真机同结果见前一帧",
-         ],
-         notes=[
-             "模拟器数据 ≠ 真机测量",
-         ]),
-
-    # ---------------- 第 8 段 ----------------
     dict(seg="第 8 段", num="8 / 10", secs=13, layout="wide", kind="real",
          title="性能与稳定性（真机实测）",
          images=[f"{S}/realboard-20260912/00_说明数据页总览.png"],
@@ -548,7 +548,7 @@ SLIDES = [
              "lvgldemo benchmark：PhyWear 场景 41 FPS（render 22 / flush 0）",
              "页面级探针：原始页 fps 12 / loops 57（数值与图线两视图同值）",
              "倾角 25 · 秒表 9 · 水平仪 26 · 单摆 8~16（随是否在解算波动）",
-             "固件 2,084,220 B（flash 12.42%）· SRAM 446,640 B / 512 KB（85.19%）",
+             "当前固件 2,554,544 B（flash 15.23%）· SRAM 496,412 B / 512 KB（94.68%）",
          ],
          notes=[
              "EPIC 硬件加速 = 官方 PR #31/#41/#121（非本队自研）",
@@ -560,50 +560,88 @@ SLIDES = [
          images=[],
          caption="来源：docs/06 §真机验证记录、docs/evidence/{ui-batch2,imu-ui}-20260915/README.md",
          card=dict(
-             head="串口日志 · 非画面（真机实测数字）",
+             head="串口日志 · 非画面（真机实测数字，当前固件口径）",
              lines=[
                  ("cmd", "$ lvgldemo benchmark"),
                  ("hi",  "PhyWear 场景 41 FPS（render 22 / flush 0）"),
                  ("cmd", "$ 页面级探针（心跳行 loops/s= 与 fps=）"),
-                 ("out", "原始传感器页 fps 12 / loops 57（数值与图线两视图同值）"),
-                 ("out", "倾角 25 · 秒表 9 · 水平仪 26 · 单摆 8~16"),
-                 ("out", "固件 2,084,220 B · SRAM 446,640 B / 512 KB（85.19%）"),
-                 ("hi",  "启动：连续 5/5、6/6 复位正常（SFBL → ABCD → NSH）"),
-                 ("out", "7 分钟泡机 0 复位（麦克风/扬声器互斥修复后）"),
+                 ("out", "原始传感器页 fps 12 / loops 57"),
+                 ("hi",  "启动 5/5 复位正常；7 分钟泡机 0 复位"),
+                 ("out", "固件 2,554,544 B · SRAM 496,412 B / 512 KB（94.68%）"),
              ]),
          lines=[
-             "⚠ SRAM 口径如实说明（本片按最新真机固件口径）：",
-             "曾一度到 93.95% 并超出「不超过 ~2 KB」额度；现已解决",
+             "⚠ SRAM 如实说明：蓝牙/网络是**新增**代码量，SRAM 比最初高；",
+             "大头靠 g_allsyms 由 .data 改 const 放 flash 降下来（−45,952 B）",
          ],
          notes=[
-             "做法：把只读符号表 g_allsyms 由 .data 改成 const 放 flash → −45,952 B",
-             "现 446,640 B（85.19%），比最初基线低约 43 KB；符号解析能力保留",
-             "注：脚本 v4 与部分旧文档仍写 492,560 B / 93.76%，已被本口径取代",
+             "旧文档里的 446,640 B / 85.19%、93.76% 都是更早构建，已作废",
          ]),
 
     # ---------------- 第 9 段 ----------------
-    dict(seg="第 9 段", num="9 / 10", secs=10, layout="log", kind="concl",
-         title="④ 蓝牙探针：no-go（三条断点）",
-         images=[],
-         caption="来源：docs/evidence/bt-probe-20260915/README.md",
-         card=dict(
-             head="结论 · 非画面（时间盒探针，已全部回退并验证复原）",
-             lines=[
-                 ("hi",  "结论：暂不可交付（no-go）—— 差的是「构建接线」，不是硬件"),
-                 ("out", "片上蓝牙控制器有（LCPU，无需外挂控制器固件）"),
-                 ("out", ".config 里 107 个 CONFIG_BT*/BLUETOOTH* 项是开的"),
-                 ("out", "但基线固件里只有 2 个 BT 符号（nm nuttx | grep -ci）"),
-                 ("out", "根因 1：CONFIG_UART_BTH4 未开 → /dev/ttyHCI0 从不注册"),
-                 ("out", "根因 2：CONFIG_NET_BLUETOOTH 未开 → BT 目标文件一个都没编"),
-                 ("out", "根因 3（决定性）：port/drivers/bluetooth/hci/ 没有 CMakeLists"),
-                 ("hi",  "undefined reference to __init___device_dts_ord_..._zephyr_bt_hci_ttyHCI0_ORD"),
-             ]),
+    dict(seg="第 9 段", num="9 / 10", secs=8, layout="watch2", kind="real",
+         title="蓝牙连接标识（真机）：未连接=灰 / 已连接=蓝",
+         images=[f"{S}/btui-20260918/root_not_connected.png",
+                 f"{S}/btui-20260918/root_connected.png"],
+         caption="真机截图 root_not_connected / root_connected.png",
          lines=[
-             "如实说：没有任何「蓝牙能用」的结论，",
-             "也没证明 LCPU 控制器一定会应答 HCI。",
+             "主界面标题右侧一枚圆点：未连接=灰、已连接=蓝，250 ms 轮询自动切换",
+             "点一下直接进「蓝牙」页 —— 手表上就能看到链路状态，不必接电脑",
+             "",
+             "⚠ 原 docs/08 里「蓝牙 no-go」的结论已作废：",
+             "   本轮已把 B1/B2/B3 全部打通（原因见下一张的真机原文）",
          ],
          notes=[
-             "SRAM 曾是最大风险（当时 93.7%）：现已降到 85.19%，蓝牙所需 ~41 KB 有余量",
+             "状态由 BT 回调写入共享结构，界面只读；回调里绝不碰 LVGL（跨线程）",
+             "证据 docs/evidence/btui-20260918/ · 详见 docs/16 §13",
+         ]),
+
+    dict(seg="第 9 段", num="9 / 10", secs=7, layout="watch", kind="real",
+         title="手表版蓝牙串口（真机）",
+         images=[f"{S}/btui-20260918/btlink_connected.png"],
+         caption="真机截图 btui-20260918/btlink_connected.png（连接中）",
+         lines=[
+             "状态 / 对端地址 / RX·TX·echo 计数 / MTU + 10 行收发原文",
+             "手机写文本 → 手表记 [RX] 并原样回 echo；手表「发送测试」→ [TX]",
+         ],
+         notes=[
+             "空白口实测：宿主写 hello-… → 收到 echo: hello-…（双向连通）",
+             "断开后页面自己翻回「未连接」并重新广播（可再连，不用复位）",
+         ]),
+
+    dict(seg="第 9 段", num="9 / 10", secs=8, layout="log", kind="concl",
+         title="两个根因都定位到代码行（真机原文）",
+         images=[],
+         caption="来源：docs/16 §1/§12 · docs/evidence/{bt-h4,bt-gatt-handle}-20260918/",
+         card=dict(
+             head="串口/空口原文 · 非画面（同一 boot 内 A/B）",
+             lines=[
+                 ("cmd", "根因① H4 的 write() 跨 task_group ⇒ 恒 EBADF"),
+                 ("out", "裸探针 : TX 01 03 0c 00  →  RX 04 0e 04 06 03 0c 00（status=0）"),
+                 ("hi",  "host栈 : TX 01 03 0c 00  →  h4_send_data -> -1 (errno 9)"),
+                 ("out", "决定性证据：h4_open tid=9 与 h4_send tid=5 的 fdlist 不同"),
+                 ("cmd", "根因② 通知帧 value handle = 0x0000（对端静默丢弃）"),
+                 ("out", "修复前 : … 1b 00 00 …  56/56 条句柄 0x0000 → 宿主 0 包"),
+                 ("hi",  "修复后 : … 1b 10 00 …  2 条句柄 0x0010 → 宿主 2 包"),
+                 ("out", "zblue gatt_notify_mc() 漏了 data.handle = handle;（补两行）"),
+             ]),
+         lines=[
+             "设备侧说「发出去了」≠ 对端真的收到了 —— 判据必须落在空口上。",
+         ],
+         notes=[
+             "两个根因都写成可复核的字节级 A/B，存档含 SHA256SUMS.txt",
+         ]),
+
+    dict(seg="第 9 段", num="9 / 10", secs=6, layout="wide", kind="real",
+         title="桌面一键测试（宿主 GUI，14/14）",
+         images=[f"{S}/bt-gui-20260918/gui_real_run_2.png"],
+         caption="宿主实录 bt-gui-20260918/gui_real_run_2.png（Tk GUI）",
+         lines=[
+             "桌面上双击即测：扫描 → 连接 → 读传感器 → 收通知 → 写命令 → 文本往返",
+             "逐项打勾并显示实测值（|a|=1009 mg、echo 原文），最后给大字结论",
+             "GUI 不另写一遍测试：与命令行共用 run_full_test()，避免两份实现跑偏",
+         ],
+         notes=[
+             "本轮就是靠它发现「测完不断开」——BlueZ 是中心设备，进程退出不断链路",
          ]),
 
     dict(seg="第 9 段", num="9 / 10", secs=10, layout="log", kind="concl",
@@ -616,7 +654,7 @@ SLIDES = [
                  ("out", "① 真机无网络栈 —— LLM 自由对话只在模拟器；真机走离线意图"),
                  ("out", "② SRAM 446,640 B（85.19%）：曾超「~2 KB」额度，已用 allsyms 入 flash 解决"),
                  ("out", "③ ③ 精度无转台真值 —— 只说与加速度计解算一致 ~0.5°"),
-                 ("out", "④ ④ 蓝牙 no-go（三条断点见前段）"),
+                 ("out", "④ 任务3 网络：本板无无线网卡（set_wifi 不可达）；USB-SLIP 缺一根数据线"),
                  ("out", "⑤ 秒表页 fps 10 → 9（一帧代价，如实说明）"),
                  ("out", "⑥ 单摆页运动判据未改：静止/振动桌面仍可能漏过无效 g"),
                  ("out", "⑦ 声学响度受板载小喇叭限制、同板声耦合弱"),
@@ -627,18 +665,19 @@ SLIDES = [
          notes=[]),
 
     dict(seg="第 9 段", num="9 / 10", secs=10, layout="title", kind="v01",
-         title="本片为 v0.1 静态素材版（样片）",
+         title="本片为 v1 成片（截图 + 数据 + 后制）",
          images=[f"{S}/ui-batch2-20260915/rev-real-home.png"],
          caption="真机截图 rev-real-home.png",
          lines=[
              "—— 不是实拍演示 ——",
              "",
-             "本片缺失（待补，已如实标注）：",
-             "① 真机动态画面（开机 / 触控切视图 / 指针盘 / 单摆真摆动）",
-             "② 真人讲稿录音（本片无音轨）",
-             "③ ⑤-1 真实晃表 3 秒 → 自动跑实验 → 可信 g 的实拍片段",
+             "本片已覆盖：蓝牙 B1/B2/B3 · 连接标识 · 手表版串口 · 桌面一键测试",
+             "仍然缺失（如实标注，不假装有）：",
+             "① 真机动态画面（真机无视频输出，只能人拿手机拍 AMOLED 屏）",
+             "② 真人讲稿录音（本片无音轨，信息走字幕）",
+             "③ 任务3 网络（本板无网卡 + 缺 USB 数据线，物理不可达）",
              "",
-             "补齐后出 v1.0 实拍版；分镜对照表见 storyboard.png",
+             "分镜对照表见 storyboard.png；拍摄脚本 docs/08",
          ],
          notes=[
              "拍摄脚本：docs/08_演示视频拍摄脚本.md（v4，10 段 / 4:55）",
@@ -682,11 +721,25 @@ def draw_header(d, slide):
     d.text((kx + (kw - d.textlength(label, font=fk)) / 2, 24), label, font=fk, fill=fg)
 
 
+def draw_caption(d, slide):
+    """底部字幕条：本片无音轨，讲清楚"现在看的是什么"全靠这一条。"""
+    txt = slide.get("sub") or SEG_SUB.get(slide["seg"], "")
+    if not txt:
+        return
+    f = font("r", 24)
+    while d.textlength(txt, font=f) > W - 96 and f.size > 15:
+        f = font("r", f.size - 1)
+    tw = d.textlength(txt, font=f)
+    y0, y1 = CONTENT_BOT + 4, CONTENT_BOT + 4 + SUB_H - 4
+    rrect(d, [24, y0, W - 24, y1], 8, fill=(12, 16, 24), outline=(60, 70, 90), width=1)
+    d.text(((W - tw) / 2, y0 + (y1 - y0 - f.size) / 2 - 1), txt, font=f, fill=(238, 242, 250))
+
+
 def draw_footer(d, t_abs):
     d.rectangle([0, FOOTER_Y, W, H], fill=(13, 15, 21))
     d.line([0, FOOTER_Y, W, FOOTER_Y], fill=(46, 52, 66))
     d.text((32, 610), FOOTER_L1, font=font("r", 20), fill=WARN)
-    d.text((32, 640), "无音轨 · 无实拍动态画面 · 真机动态画面待实拍", font=font("r", 18), fill=DIM)
+    d.text((32, 640), "无音轨 · 无实拍动态画面（真机无视频输出）· 动态为后制推拉", font=font("r", 18), fill=DIM)
 
     # 进度条
     bx0, bx1, by = 32, W - 32, 672
@@ -1142,6 +1195,7 @@ def main():
             img = render_slide(s)
             d0 = ImageDraw.Draw(img)
             draw_header(d0, s)
+            draw_caption(d0, s)
             draw_footer(d0, sum(x["secs"] for x in SLIDES[:i - 1]) + s["secs"] / 2)
             p = os.path.join(d, "slide-%02d-%s.png" % (i, s["seg"].replace(" ", "")))
             img.save(p)
@@ -1160,6 +1214,7 @@ def main():
         img = render_slide(s)
         d = ImageDraw.Draw(img)
         draw_header(d, s)
+        draw_caption(d, s)
         bases.append(img)
     print("[render]  %d 张分镜底图 %.1fs" % (len(bases), time.time() - t0))
 
@@ -1169,6 +1224,10 @@ def main():
            "-r", str(a.fps), "-i", "-",
            "-an",
            "-c:v", "libx264", "-preset", a.preset, "-crf", str(a.crf),
+           # 本片内容形态是"文字卡 + 截图 + 缓慢推拉"，x264 的 stillimage
+           # 就是为这种"长时间几乎不动"的素材设计的：同样观感下码率明显更低。
+           # （不加它时 CRF 30/15fps 还要 7.7 MB，超过本仓 5 MB 的单文件红线。）
+           "-tune", "stillimage",
            "-pix_fmt", "yuv420p", "-profile:v", "high", "-level", "4.0",
            "-movflags", "+faststart", out]
     print("[encode]  %s" % " ".join(cmd))
@@ -1183,7 +1242,30 @@ def main():
             nf = int(round(slide["secs"] * a.fps))
             for k in range(nf):
                 t_abs = (fi + 0.5) / a.fps
-                fr = base.copy()
+                # 每张分镜极缓慢推近（1.00 → KB_ZOOM）+ 轻微平移。
+                # 为什么这么做：真机无视频输出，本片画面只能是截图；
+                # 整帧推拉是纪录片处理静帧的标准手法，能让静态素材"活"起来，
+                # 而且是对**渲染完成的整帧**做缩放 —— 不碰任何版式，零溢出风险。
+                # 运动设计：**入场 0.5 s 推近，随后完全静止**。
+                # 为什么不做全程连续推拉：那会让每一帧都变，x264 只好把整幅
+                # （含中文字）反复重编码 —— 1280x720/4:44 想压进本仓 5 MB 的单文件
+                # 红线就得上 CRF 34，中文出现明显块状伪影（实测过）。
+                # 改成"入场动、其余静止"后绝大多数帧完全相同、x264 直接跳过，
+                # 省下的码率全部给文字清晰度；观感上每张分镜仍有"起势"。
+                ramp = max(1, int(round(KB_IN_MS * a.fps / 1000.0)))
+                ph = min(1.0, k / float(ramp))
+                # 把推拉**量化成固定步数**（每张分镜 KB_STEPS 步）。
+                # 为什么较真：逐帧连续缩放会让**每一帧都变**，x264 只好把整幅
+                # （包括中文文字）重新编码 —— 实测 12fps 要压到 5 MB 以内就得上
+                # CRF 34，文字出现明显块状伪影。量化之后同一步内多帧**完全相同**，
+                # x264 直接跳过，码率省下来给文字质量（同尺寸可低 ~6 个 CRF 点，
+                # 中文清晰可读）。观感上 24 步的推拉仍然连续。
+                ph = round(ph * KB_STEPS) / float(KB_STEPS)
+                z = 1.0 + (KB_ZOOM - 1.0) * ph
+                w2, h2 = int(W / z) & ~1, int(H / z) & ~1
+                x0 = int((W - w2) * slide.get("kbx", 0.5))
+                y0 = int((H - h2) * slide.get("kby", 0.5))
+                fr = base.crop((x0, y0, x0 + w2, y0 + h2)).resize((W, H), Image.BILINEAR)
                 draw_footer(ImageDraw.Draw(fr), t_abs)
                 proc.stdin.write(fr.tobytes())
                 fi += 1
