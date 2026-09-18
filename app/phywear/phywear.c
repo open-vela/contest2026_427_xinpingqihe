@@ -642,6 +642,10 @@ int pw_cap_open(const char *name)
    * 而 shot 是"开机后第一个 GUI"，没法先连一次再重启拍照。 */
   else if (strcmp(name, "btafter")   == 0) { if (!pw_bt_is_up()) pw_bt_init();
                                              pw_ui_root(); return 1; }
+  /* 同上，但拍的是**蓝牙页**而不是主页：主页那枚点走 ui_bt_tick，
+   * 蓝牙页的状态走 btp_tick —— 两条不同的刷新路径，都得证。 */
+  else if (strcmp(name, "btlog")     == 0) { if (!pw_bt_is_up()) pw_bt_init();
+                                             scr = pw_bt_screen(); }
   else if (strcmp(name, "voice")     == 0) scr = pw_voice_screen();
   else if (strncmp(name, "board", 5) == 0 && name[5] >= '0' && name[5] <= '5')
                                           { return pw_ui_open_board(name[5] - '0'); }
@@ -1815,9 +1819,11 @@ int main(int argc, FAR char *argv[])
             if (shot_once && cap_screen != NULL &&
                 (strcmp(cap_screen, "btlink") == 0 ||
                  strcmp(cap_screen, "bthome") == 0 ||
-                 strcmp(cap_screen, "btafter") == 0))
+                 strcmp(cap_screen, "btafter") == 0 ||
+                 strcmp(cap_screen, "btlog") == 0))
               {
-                int after = (strcmp(cap_screen, "btafter") == 0);
+                int after = (strcmp(cap_screen, "btafter") == 0 ||
+                             strcmp(cap_screen, "btlog") == 0);
                 int conn = pw_bt_link()->connected ? 1 : 0;
 
                 if (after && shot_bt_phase == 0)

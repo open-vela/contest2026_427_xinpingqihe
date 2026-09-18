@@ -82,6 +82,33 @@ def fill_info_table(doc) -> int:
     return filled
 
 
+def add_md_table(doc, anchor, block):
+    """把一段 markdown 表格行（| a | b |）转成真正的 docx 表格，并插到 anchor 之后。"""
+    rows = []
+    for r in block:
+        cells = [c.strip() for c in r.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{2,}:?", c or "-") for c in cells):
+            continue                      # 分隔行
+        rows.append(cells)
+    if not rows:
+        return anchor
+    ncol = max(len(r) for r in rows)
+    t = doc.add_table(rows=len(rows), cols=ncol)
+    try:
+        t.style = "Table Grid"            # 模板可能没有该样式，拿不到就退回默认
+    except Exception:
+        pass
+    for i, r in enumerate(rows):
+        for j in range(ncol):
+            t.cell(i, j).text = r[j] if j < len(r) else ""
+            if i == 0:
+                for para in t.cell(i, j).paragraphs:
+                    for run in para.runs:
+                        run.bold = True
+    anchor.addnext(t._tbl)
+    return t._tbl
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--template", required=True)
@@ -102,18 +129,26 @@ def main() -> int:
                 if not body:
                     continue
                 anchor = para._p
-                for line in body:
+                i = 0
+                while i < len(body):
+                    line = body[i]
+                    if not line.strip():
+                        i += 1
+                        continue
+                    if line.lstrip().startswith("|"):
+                        blk = []
+                        while i < len(body) and body[i].lstrip().startswith("|"):
+                            blk.append(body[i]); i += 1
+                        anchor = add_md_table(doc, anchor, blk)
+                        inserted += 1
+                        continue
                     new = doc.add_paragraph()
                     new.paragraph_format.space_after = Pt(2)
-                    if not line.strip():
-                        continue
-                    if line.startswith(("- ", "| ")):
-                        new.add_run(line.strip())
-                    else:
-                        new.add_run(line.strip())
+                    new.add_run(line.strip())
                     anchor.addnext(new._p)
                     anchor = new._p
                     inserted += 1
+                    i += 1
                 break
 
     out = Path(args.out)
