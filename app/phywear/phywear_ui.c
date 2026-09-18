@@ -201,6 +201,11 @@ static void ui_del_cb(lv_event_t *e)
 static lv_obj_t *g_bt_dot;          /* 主界面状态点；根屏重建后重新指向 */
 static lv_obj_t *g_bt_lab;          /* 旁边那两个字 */
 static uint8_t   g_bt_last;         /* 上次画出来的连接状态，避免每 250ms 白重绘 */
+static uint8_t   g_bt_last_wait;    /* 上次画出来的"启动中"状态（同上） */
+
+/* 第三种状态：host 栈正在后台起（~1.2 s）。用琥珀色，与"灰=未连接/蓝=已连接"
+ * 区分开，免得用户以为点了没反应。 */
+#define PW_COL_BT_WAIT 0xE0A458
 static uint8_t   g_bt_dirty;        /* 1 = 还没画过（根屏刚建好） */
 static uint8_t   g_bt_timer_started;
 
@@ -221,9 +226,10 @@ static void ui_bt_btn_cb(lv_event_t *e)
   pw_scr_open(pw_bt_screen());
 }
 
-static void ui_bt_apply(uint8_t on)
+static void ui_bt_apply(uint8_t on, uint8_t waiting)
 {
-  lv_color_t col = on ? PW_COL_BT_ON : PW_COL_BT_OFF;
+  lv_color_t col = on ? PW_COL_BT_ON :
+                   (waiting ? lv_color_hex(PW_COL_BT_WAIT) : PW_COL_BT_OFF);
 
   if (g_bt_dot != NULL && lv_obj_is_valid(g_bt_dot))
     {
@@ -245,6 +251,7 @@ static void ui_bt_tick(lv_timer_t *t)
 {
   FAR const struct pw_bt_link_s *lk = pw_bt_link();
   uint8_t on = lk->connected ? 1 : 0;
+  uint8_t waiting = (!pw_bt_is_up() && pw_bt_is_starting()) ? 1 : 0;
 
   (void)t;
 
@@ -253,14 +260,15 @@ static void ui_bt_tick(lv_timer_t *t)
       return;                     /* 当前不在根屏（已返回上一级），不用画 */
     }
 
-  if (!g_bt_dirty && on == g_bt_last)
+  if (!g_bt_dirty && on == g_bt_last && waiting == g_bt_last_wait)
     {
       return;                     /* 状态没变，不重绘 */
     }
 
-  g_bt_last = on;
-  g_bt_dirty = 0;
-  ui_bt_apply(on);
+  g_bt_last      = on;
+  g_bt_last_wait = waiting;
+  g_bt_dirty     = 0;
+  ui_bt_apply(on, waiting);
 }
 
 /* 在根屏上放一枚状态点 + 两个字。返回是否创建成功。 */
@@ -1203,11 +1211,16 @@ static void btp_tick(lv_timer_t *t)
 
   /* 状态区 */
   btp_set_if_changed(g_btp_state,
-                     lk->connected ? (lk->subscribed ? "已连接 · 已订阅"
-                                                    : "已连接")
-                                   : "未连接");
-  lv_obj_set_style_text_color(g_btp_state,
-                              lk->connected ? PW_COL_BT_ON : PW_COL_BT_OFF, 0);
+                     (!pw_bt_is_up() && pw_bt_is_starting())
+                         ? "启动中"
+                     : lk->connected ? (lk->subscribed ? "已连接 · 已订阅"
+                                                       : "已连接")
+                                     : "未连接");
+  lv_obj_set_style_text_color(
+      g_btp_state,
+      lk->connected ? PW_COL_BT_ON :
+      ((!pw_bt_is_up() && pw_bt_is_starting()) ? lv_color_hex(PW_COL_BT_WAIT)
+                                               : PW_COL_BT_OFF), 0);
 
   if (lk->connected)
     {
@@ -1294,9 +1307,13 @@ lv_obj_t *pw_bt_screen(void)
    * **唯一**看到蓝牙状态的地方；若打开它却永远是"未连接"（因为栈压根没起、
    * 也没在广播），这页就等于没用 —— 而手表上没有任何别的入口能把蓝牙打开。
    * pw_bt_init() 是幂等的（见 pw_bt.h），已经起过就立刻返回。 */
+  /* ⚠️ 必须用**异步**入口：`bt_enable()` 实测 ~1.2 s，而这一页是在 LVGL
+   * 主线程上建的 —— 同步调就是"点一下冻一秒"（用户 2026-09-18 反馈：
+   * "点击到蓝牙会卡顿 1S 左右"）。起栈期间状态卡显示"启动中"，
+   * 300 ms 的 tick 起来后自动换成真实状态。 */
   if (!pw_bt_is_up())
     {
-      pw_bt_init();
+      pw_bt_init_async();
     }
 
   /* ── 链路状态卡（390-16 宽，92 高）── */

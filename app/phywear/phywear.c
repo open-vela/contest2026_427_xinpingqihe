@@ -68,6 +68,12 @@
                                      * 故取 2 ms 省 CPU；10 = 改动前的固定行为 */
 #endif
 
+/* 纯 GUI 模式下，开机后在**后台**把蓝牙 host 栈起起来（不阻塞界面）。
+ * 置 0 可整体关掉（那时只有点开「蓝牙」页或跑 `phywear cap bt` 才会起栈）。 */
+#ifndef PW_BT_AUTOSTART
+#  define PW_BT_AUTOSTART 1
+#endif
+
 #include <nuttx/input/touchscreen.h>
 #include <nuttx/sensors/lsm6dsl.h>
 #include <nuttx/sensors/mmc5603.h>
@@ -113,6 +119,12 @@ static int             g_fps_fd = -1;
 static unsigned char  *g_fps_mem;
 static size_t          g_fps_frame;     /* 单帧字节数 */
 static volatile uint32_t g_fps_cnt;
+
+/* 见 phywear_ui.h：界面线程推帧计数（单调增），给 pw_bt.c 的取证用。 */
+uint32_t pw_ui_flush_count(void)
+{
+  return g_fps_cnt;
+}
 static volatile uint32_t g_loop_next_ms;   /* LVGL 建议的下次休眠上限（ms） */
 
 #if PW_PERF_PROBE
@@ -1610,6 +1622,13 @@ int main(int argc, FAR char *argv[])
   else
     {
       pw_ui_root();
+
+      /* 纯 GUI：后台起蓝牙（理由见 PW_BT_AUTOSTART 的注释）。
+       * 只放在这一支 —— `phywear shot/cap` 是取证入口，串口要被像素文本流独占，
+       * BT 日志会撕行导致截图被拒（docs/07 坑 ②），所以那些模式绝不自动起栈。 */
+#if PW_BT_AUTOSTART
+      pw_bt_init_async();
+#endif
     }
 
   /* 自动演示：开始自导航（前沿根屏运行，lv_timer 逐步打开/返回） */
