@@ -1795,66 +1795,116 @@ int main(int argc, FAR char *argv[])
 
             /* 蓝牙页的取证等待（**仅 shot 模式**）。
              *
-             * 为什么需要：这一页要证明的恰恰是"连上以后长什么样" ——
+             * 为什么需要：这几页要证明的恰恰是"连上/断开之后长什么样" ——
              * 未连接时点是灰的、日志是空的，截出来什么都证明不了；
-             * 而"连上"是**外部行为**（宿主的 BLE 中心设备发起连接），
+             * 而"连上/断开"都是**外部行为**（宿主的 BLE 中心设备发起），
              * 板子只能等。等的时候 LVGL 照常跑，指示点/状态字本来就会
-             * 随 pw_bt_link() 自己变蓝。
+             * 随 pw_bt_link() 自己醒/变蓝。
              *
-             * 因此：shot 模式截 btlink 时，最多多等
-             * PW_SHOT_BT_WAIT_MS；一旦看到链路起来，**再静默
-             * PW_SHOT_BT_QUIET_MS** 才出图（宿主那串订阅/读/写的控制台打印
-             * 会撕坏像素流，见宏处的说明）。超时也照出图并打印
-             * WAIT-TIMEOUT，免得把"没连上"伪装成"连上了"。 */
+             * 三个入口，语义不同：
+             *   btlink / bthome ：等**连上** → 静默 PW_SHOT_BT_QUIET_MS → 出图
+             *   btafter         ：等连上 → 等**断开** → 再静默 → 出图
+             *                     （用户报的就是"断开后还显示已连接"，
+             *                       所以要拍的是断开之后那一刻）
+             *
+             * 为什么要静默：BT 侧在连接/订阅/读写的每一步都会往控制台打日志，
+             * 而截图是把上千行像素以**文本**形式从同一个控制台流出去的 ——
+             * 两者一交叉就撕掉像素行，pwshot 逐行校验会直接拒收整帧。
+             *
+             * 超时都照出图并打印原因，免得把"没连上"伪装成"连上了"。 */
             if (shot_once && cap_screen != NULL &&
                 (strcmp(cap_screen, "btlink") == 0 ||
                  strcmp(cap_screen, "bthome") == 0 ||
                  strcmp(cap_screen, "btafter") == 0))
               {
-                /* btafter 的两阶段：先等连上（证明链路真建立过），
-                 * 再等断开（这才是要拍的那一刻）。 */
-                if (strcmp(cap_screen, "btafter") == 0 &&
-                    shot_bt_phase == 0 && pw_bt_link()->connected)
-                  {
-                    shot_bt_phase = 1;
-                    shot_bt_conn_ms = 0;
-                    printf("[phywear] BT shot(btafter): 已连上，等它断开 ……\n");
-                    fflush(stdout);
-                  }
+                int after = (strcmp(cap_screen, "btafter") == 0);
+                int conn = pw_bt_link()->connected ? 1 : 0;
 
-                if (strcmp(cap_screen, "btafter") == 0 && shot_bt_phase == 1 &&
-                    pw_bt_link()->connected)
+                if (after && shot_bt_phase == 0)
                   {
-                    continue;                 /* 还没断，继续等 */
-                  }
-
-                if (!pw_bt_link()->connected)
-                  {
-                    if (waited < settle + PW_SHOT_BT_WAIT_MS)
+                    /* 阶段 0：等连上（证明链路真的建立过） */
+                    if (!conn)
                       {
-                        if (waited >= settle && waited - settle < 1000)
+                        if (waited < settle + PW_SHOT_BT_WAIT_MS)
                           {
-                            printf("[phywear] BT shot: 等链路起来 ……\n");
+                            continue;
+                          }
+
+                        printf("[phywear] BT shot(btafter): 一直没连上，"
+                               "按未连接出图\n");
+                        fflush(stdout);
+                      }
+                    else
+                      {
+                        shot_bt_phase = 1;
+                        shot_bt_conn_ms = 0;
+                        printf("[phywear] BT shot(btafter): 已连上，"
+                               "等它断开 ……\n");
+                        fflush(stdout);
+                        continue;               /* 立刻接着等断开 */
+                      }
+                  }
+                else if (after && shot_bt_phase == 1)
+                  {
+                    /* 阶段 1：等断开，断开后再静默一会儿才出图 */
+                    if (conn)
+                      {
+                        if (waited < settle + PW_SHOT_BT_WAIT_MS)
+                          {
+                            continue;
+                          }
+
+                        printf("[phywear] BT shot(btafter): 等断开超时，"
+                               "仍连着（这次拍不到断开后的样子）\n");
+                        fflush(stdout);
+                      }
+                    else
+                      {
+                        if (shot_bt_conn_ms == 0)
+                          {
+                            shot_bt_conn_ms = waited;
+                            printf("[phywear] BT shot(btafter): 已断开，"
+                                   "静默 %d ms 后出图\n", PW_SHOT_BT_QUIET_MS);
                             fflush(stdout);
                           }
 
-                        continue;             /* 继续跑 GUI，稍后再判 */
+                        if (waited < shot_bt_conn_ms + PW_SHOT_BT_QUIET_MS)
+                          {
+                            continue;
+                          }
                       }
-
-                    printf("[phywear] BT shot: WAIT-TIMEOUT 未连上，"
-                           "按未连接状态出图\n");
-                    fflush(stdout);
                   }
                 else
                   {
-                    if (shot_bt_conn_ms == 0)
+                    /* btlink / bthome：等连上 → 静默 → 出图 */
+                    if (!conn)
                       {
-                        shot_bt_conn_ms = waited;
-                      }
+                        if (waited < settle + PW_SHOT_BT_WAIT_MS)
+                          {
+                            if (waited >= settle && waited - settle < 1000)
+                              {
+                                printf("[phywear] BT shot: 等链路起来 ……\n");
+                                fflush(stdout);
+                              }
 
-                    if (waited < shot_bt_conn_ms + PW_SHOT_BT_QUIET_MS)
+                            continue;
+                          }
+
+                        printf("[phywear] BT shot: WAIT-TIMEOUT 未连上，"
+                               "按未连接状态出图\n");
+                        fflush(stdout);
+                      }
+                    else
                       {
-                        continue;
+                        if (shot_bt_conn_ms == 0)
+                          {
+                            shot_bt_conn_ms = waited;
+                          }
+
+                        if (waited < shot_bt_conn_ms + PW_SHOT_BT_QUIET_MS)
+                          {
+                            continue;
+                          }
                       }
                   }
               }
