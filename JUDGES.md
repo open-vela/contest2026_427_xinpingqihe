@@ -94,13 +94,25 @@ cmake --build cmake_out/vela_goldfish-arm64-v8a-ap-phywear -j16
    五个子仓里，必须叠在 openvela 基线上（这正是路径 B 第 ② 步的作用）。
 2. **团队 manifest 的局限**：本仓根目录的 `contest2026_427_xinpingqihe.xml` 只把 `app/phywear`
    链接进工作区，**不含** `src/**` 的公共仓改动 —— 所以仍要跑第 ② 步的恢复脚本（它已覆盖全部 169 个文件）。
-3. **真机没有网络栈**：真机上 LLM 对话不可用，走端侧离线意图 + 工具；**端云 LLM 对话在模拟器演示**
-   （小米 MiMo Token Plan；实测记录见 `docs/evidence/llm-20260913/`）。
+3. **真机没有网络栈 —— 且本板没有无线网卡**（2026-09-18 实测判定）：真机上 LLM 对话不可用，
+   走端侧离线意图 + 工具；**端云 LLM 对话在模拟器演示**（小米 MiMo Token Plan；
+   实测记录见 `docs/evidence/llm-20260913/`）。
+   关于"用 `set_wifi` 连 WiFi 拿 DHCP IP"：黄山派 SF32LB52 **没有无线网卡** ——
+   运行时 `ifconfig` 直接 `ifconfig: open failed: 2`（ENOENT：命令在、网卡不在），
+   `/dev` 里没有任何 wlan/eth 设备，defconfig 无 `CONFIG_WIFI`/`CONFIG_DRIVERS_IEEE80211`，
+   厂商 BSP 也没有任何 WiFi 芯片驱动。所以**网络通路在本板物理不可达**，不是软件没写完；
+   `set_wifi` 的实现走 `ifup wlan0` + `wapi`，需要真实网卡。详见 `docs/16 §11.3`。
 4. **"主动+执行"场景已交付并默认开启**（`PW_WATCH_PROACTIVE 1`，2026-09-15）：晃表 → Agent 自动开单摆实验 →
    结果进手表 AI 日志，真机已验证（`docs/evidence/proactive-20260915/`）；两个真崩溃已修（`velaclaw_ask` 断言、
    cJSON 双重释放），`ai_agent` 已开机自启。**残余**：静止/振动桌面下单摆页仍可能给出无效 g（三道有效性门
    有漏过，约 1 条/70 s），根治需改页面运动判据 —— 详见 `docs/03 §7`。
-5. **EPIC 硬件加速来自官方 PR**（vendor_sifli #31 / lvgl #41 / nuttx-apps #121），**非本队原创**；
+5. **蓝牙：B1/B2 已打通，B3 待人工**（2026-09-18）：片内 LCPU 蓝牙控制器 + zblue host 栈已跑起来 ——
+   `phywear cap bt` 打印 `[bt] bt_enable rc=0`，并注册好 GATT 服务（`e0f1a000-…`）、
+   开好可被发现广播（名字 `PhyWear`），服务端自检 `SELFTEST PASS`。
+   **未做**：用真实手机连上去做一次 ATT 读写（**需人工**，脚本 `tools/pw_bt_b3.py` 一条命令判定）。
+   ⚠️ 广播用**随机地址**（EXT_ADV + PRIVACY），**手机上请按名字 `PhyWear` 找，不要按 MAC 找**。
+   技术细节与根因见 `docs/03 §4.10b` 与 `docs/16`。
+6. **EPIC 硬件加速来自官方 PR**（vendor_sifli #31 / lvgl #41 / nuttx-apps #121），**非本队原创**；
    本队做的是集成 + UI/算法层优化 + 驱动/应用。
-6. **模拟器数据是合成的**；模拟器帧率（22–23）与真机（约 41）不可混用。
-7. 若某步在您的环境失败，请把 `check_progress.py` 的输出发给我们（它会指出缺哪一项）。
+7. **模拟器数据是合成的**；模拟器帧率（22–23）与真机（约 41）不可混用。
+8. 若某步在您的环境失败，请把 `check_progress.py` 的输出发给我们（它会指出缺哪一项）。
