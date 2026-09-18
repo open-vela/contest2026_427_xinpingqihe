@@ -272,12 +272,27 @@ static void pw_sample_work_handler(struct k_work *work)
 
   if (g_nfy_on)
     {
+      /* 诊断开关：为 1 时**每次**通知都打印 rc（排查"订阅了但收不到包"）；
+       * 平时置 0，只在出错时打一行。
+       * 2026-09-18：这个开关正是抓到"设备侧 rc=0、手机侧收不到"的功臣 ——
+       * 顺着它打开 h4.c 的 PW_H4_TRACE，才在空口原文里看到通知帧的
+       * value handle 是 0x0000（zblue gatt_notify_mc 漏 data.handle）。
+       * 根因已修（见 docs/evidence/bt-gatt-handle-20260918/），开关归 0。 */
+#define PW_BT_NOTIFY_TRACE 0
+      static unsigned int nfy_tick;
       int rc = bt_gatt_notify(NULL, &pw_attrs[PW_ATTR_SENSOR_VALUE], &g_pkt,
                               sizeof(g_pkt));
+
+      nfy_tick++;
+#if PW_BT_NOTIFY_TRACE
+      printf("[bt] notify #%u rc=%d len=%u\n", nfy_tick, rc,
+             (unsigned)sizeof(g_pkt));
+#else
       if (rc && rc != -ENOTCONN)
         {
-          printf("[bt] notify rc=%d\n", rc);
+          printf("[bt] notify #%u rc=%d\n", nfy_tick, rc);
         }
+#endif
     }
 
   k_work_reschedule(&g_sample_work, K_MSEC(PW_SAMPLE_MS));
@@ -510,6 +525,15 @@ int pw_btgatt_start(void)
 
   rc = bt_conn_cb_register(&pw_conn_cb);
   printf("[bt] B2 conn cb register rc=%d\n", rc);
+
+  /* ⚠️ 广播数据里我们写的是 "PhyWear"，但 **GAP 的 Device Name 特性**取的是
+   * `CONFIG_BT_DEVICE_NAME`（本板默认 "Zephyr"）—— 两者不一致时：
+   * 手机首次扫描看到 "PhyWear"，连上后读名字（或系统缓存）就变成 "Zephyr"。
+   * **实测（2026-09-18，宿主 BlueZ）**：断开重连后设备名显示为 'Zephyr'，
+   * 就是踩了这个坑。这里把 GAP 名字也设成 "PhyWear"。
+   * （需要 CONFIG_BT_DEVICE_NAME_DYNAMIC=y，本板已开。） */
+  rc = bt_set_name("PhyWear");
+  printf("[bt] B2 set_name \"PhyWear\" rc=%d\n", rc);
 
   rc = bt_le_adv_start(BT_LE_ADV_CONN, pw_ad, ARRAY_SIZE(pw_ad), pw_sd,
                        ARRAY_SIZE(pw_sd));

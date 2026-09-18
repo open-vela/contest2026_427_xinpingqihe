@@ -106,12 +106,18 @@ cmake --build cmake_out/vela_goldfish-arm64-v8a-ap-phywear -j16
    结果进手表 AI 日志，真机已验证（`docs/evidence/proactive-20260915/`）；两个真崩溃已修（`velaclaw_ask` 断言、
    cJSON 双重释放），`ai_agent` 已开机自启。**残余**：静止/振动桌面下单摆页仍可能给出无效 g（三道有效性门
    有漏过，约 1 条/70 s），根治需改页面运动判据 —— 详见 `docs/03 §7`。
-5. **蓝牙：B1/B2 已打通，B3 待人工**（2026-09-18）：片内 LCPU 蓝牙控制器 + zblue host 栈已跑起来 ——
-   `phywear cap bt` 打印 `[bt] bt_enable rc=0`，并注册好 GATT 服务（`e0f1a000-…`）、
+5. **蓝牙：B1/B2/B3 全部打通**（2026-09-18）：片内 LCPU 蓝牙控制器 + zblue host 栈已跑起来 ——
+   `phywear cap bt` 打印 `[bt] bt_enable rc=0`，注册好 GATT 服务（`e0f1a000-…`）、
    开好可被发现广播（名字 `PhyWear`），服务端自检 `SELFTEST PASS`。
-   **未做**：用真实手机连上去做一次 ATT 读写（**需人工**，脚本 `tools/pw_bt_b3.py` 一条命令判定）。
-   ⚠️ 广播用**随机地址**（EXT_ADV + PRIVACY），**手机上请按名字 `PhyWear` 找，不要按 MAC 找**。
-   技术细节与根因见 `docs/03 §4.10b` 与 `docs/16`。
+   **B3 也已实测通过**：宿主 BlueZ（Intel AX201）当 BLE 中心设备，完成
+   连接 → 读 `…a001`（16 B，解出 ax/ay/az，|a|≈1014 mg）→ 订阅 Notify（收到包）→
+   写 `…a002` 'ping'，**设备侧 6/6 + 宿主侧 9/9 全过**，一条命令无人化复现：
+   `python3 tools/phywear/pw_bt_b3.py --central --out <dir>`。
+   **如实说明**：本队**没有在真手机（Android/iOS）上点过**，用的是宿主 BlueZ 中心设备，
+   动作与手机上用 nRF Connect 完全对应；手机路径（`--wait 240`）保留可作独立交叉验证。
+   ⚠️ 广播用**随机地址**（EXT_ADV + PRIVACY），**请按名字 `PhyWear` 找，不要按 MAC 找**。
+   两个根因① NuttX fd 表按 `task_group` ⇒ H4 TX 恒 `EBADF`、② zblue `gatt_notify_mc()` 漏
+   `data.handle` ⇒ 通知帧句柄 0x0000 被对端静默丢弃，见 `docs/03 §4.10b/§4.10c` 与 `docs/16`。
 6. **EPIC 硬件加速来自官方 PR**（vendor_sifli #31 / lvgl #41 / nuttx-apps #121），**非本队原创**；
    本队做的是集成 + UI/算法层优化 + 驱动/应用。
 7. **模拟器数据是合成的**；模拟器帧率（22–23）与真机（约 41）不可混用。

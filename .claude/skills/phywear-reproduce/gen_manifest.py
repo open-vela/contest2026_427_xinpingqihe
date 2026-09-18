@@ -75,6 +75,12 @@ RULES = [
      "src/apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
      "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
      "exact", True),
+    ("zblue-gatt", "zblue GATT host 补丁（本队修复 B3：gatt_notify_mc/gatt_indicate_mc "
+     "漏了 data.handle = handle; ⇒ 通知帧的 value handle 恒为 0x0000，对端静默丢弃；"
+     "补回上游 Zephyr 的语义）",
+     "src/apps/external/zblue/zblue/subsys/bluetooth/host/gatt.c",
+     "external/zblue/zblue/subsys/bluetooth/host/gatt.c",
+     "exact", True),
     ("lcd-our", "板级 LCD 帧缓冲驱动改动（本队：防撕行等待实验开关，默认＝原行为）",
      "src/vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c",
      "vendor/sifli/boards/sf32lb52/drivers/lcd/drv_lcd_fb.c", "exact", True),

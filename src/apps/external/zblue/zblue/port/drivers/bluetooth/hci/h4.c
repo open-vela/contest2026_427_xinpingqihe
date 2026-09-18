@@ -85,6 +85,10 @@ struct h4_data {
  * 置 0 时所有调用点被宏消掉，零 flash / 零 SRAM 开销。
  * 另外 `nxsched_get_fdlist()` 打印用于确认"谁在写、在哪个 task_group"——
  * 这正是本次根因的决定性证据（见 docs/16）。
+ *
+ * 2026-09-18：B3 又靠它抓到一个只在空口上看得见的 bug —— 通知帧的
+ * value handle 是 0x0000（zblue gatt_notify_mc 漏 data.handle）。
+ * 证据存档 docs/evidence/bt-gatt-handle-20260918/，正式固件归 0。
  */
 #define PW_H4_TRACE 0
 

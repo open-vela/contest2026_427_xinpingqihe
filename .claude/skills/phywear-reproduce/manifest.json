@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 16:16:33",
- "generated_at_epoch": 1789719393,
+ "generated_at": "2026-09-18 16:58:52",
+ "generated_at_epoch": 1789721932,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
-  "files": 213,
-  "critical": 136,
-  "bytes": 9088123,
+  "files": 216,
+  "critical": 139,
+  "bytes": 9287512,
   "missing_in_workspace": 0
  },
  "files": [
@@ -502,8 +502,8 @@
    "dst": "apps/examples/phywear/pw_btgatt.c",
    "compare": "exact",
    "critical": true,
-   "md5": "bbf9a35325c8c00bc67af1b2e2eaee4e",
-   "size": 20055,
+   "md5": "4615d4d0ae8021234689e35c93d509c6",
+   "size": 21409,
    "present": true
   },
   {
@@ -898,8 +898,8 @@
    "dst": "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
    "compare": "exact",
    "critical": true,
-   "md5": "1b5c407d9f02e6adb89cc81c83020d5f",
-   "size": 16147,
+   "md5": "e6e1e3e39d9d5962408296ee9c3f5d39",
+   "size": 16392,
    "present": true
   },
   {
@@ -911,6 +911,17 @@
    "critical": true,
    "md5": "10f4dc5ad00a662ff59d88e05da31b25",
    "size": 6981,
+   "present": true
+  },
+  {
+   "rule": "zblue-gatt",
+   "rule_desc": "zblue GATT host 补丁（本队修复 B3：gatt_notify_mc/gatt_indicate_mc 漏了 data.handle = handle; ⇒ 通知帧的 value handle 恒为 0x0000，对端静默丢弃；补回上游 Zephyr 的语义）",
+   "snap": "src/apps/external/zblue/zblue/subsys/bluetooth/host/gatt.c",
+   "dst": "external/zblue/zblue/subsys/bluetooth/host/gatt.c",
+   "compare": "exact",
+   "critical": true,
+   "md5": "4e85864f95d9caefa150e7a559ee58b3",
+   "size": 175082,
    "present": true
   },
   {
@@ -1301,12 +1312,34 @@
   {
    "rule": "tools",
    "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_ble_central.py",
+   "dst": "tools/phywear/pw_ble_central.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "92ef252c32210da8cb8a55e1cf3df996",
+   "size": 13298,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
    "snap": "tools/pw_bt_b3.py",
    "dst": "tools/phywear/pw_bt_b3.py",
    "compare": "exact",
    "critical": true,
-   "md5": "22266b049f43e496663d03a05059499b",
-   "size": 9954,
+   "md5": "284e1600093089844f28e11d1b24bddb",
+   "size": 14271,
+   "present": true
+  },
+  {
+   "rule": "tools",
+   "rule_desc": "主机侧脚本（真机自检 / 截图 / 证据生成）",
+   "snap": "tools/pw_h4_notify_decode.py",
+   "dst": "tools/phywear/pw_h4_notify_decode.py",
+   "compare": "exact",
+   "critical": true,
+   "md5": "985b43b5b81f773c864a01f9cf86f503",
+   "size": 5093,
    "present": true
   },
   {

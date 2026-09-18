@@ -13,12 +13,20 @@
     ⑥ 断开正常                    ← [bt] B3 disconnected: …（可选，不断开不算失败）
 
 用法（板子插着、串口空闲）：
-    python3 tools/phywear/pw_bt_b3.py --out docs/evidence/bt-b3-$(date +%Y%m%d-%H%M)
-  脚本会复位板子、跑 `phywear cap bt`，然后**打印提示并等 --wait 秒**（默认 240），
-  这段时间里用手机（nRF Connect / LightBlue）：
-      按名字找 "PhyWear"（不要按 MAC —— 广播用的是随机地址）
-      → 连接 → 读特征 …a001 → 对 …a001 打开 Notify → 往 …a002 写 ping
-  到时间后脚本打印 PASS/FAIL 表并把日志 + sha256 落盘。
+  ① 无人化（本机有蓝牙控制器时首选 —— 电脑自己当中心设备）：
+      python3 tools/phywear/pw_bt_b3.py --central \
+          --out docs/evidence/bt-b3-$(date +%Y%m%d-%H%M)
+     脚本复位板子 → 跑 `phywear cap bt` → 自己扫描/连接/读/订阅/写，
+     设备侧证据取自串口原文，宿主侧证据落 <out>/central.log。
+  ② 人工（用手机，作为独立交叉验证）：
+      python3 tools/phywear/pw_bt_b3.py --out docs/evidence/bt-b3-$(date +%Y%m%d-%H%M)
+     脚本**打印提示并等 --wait 秒**（默认 240），这段时间里用手机
+     （nRF Connect / LightBlue）：
+       按名字找 "PhyWear"（不要按 MAC —— 广播用的是随机地址）
+       → 连接 → 读特征 …a001 → 对 …a001 打开 Notify → 往 …a002 写 ping
+  两种方式最后都打印 PASS/FAIL 表并把日志 + sha256 落盘。
+
+⚠️ 本脚本一律在**电脑**上跑；手机只是个通用 BLE 调试 App，不用装本项目任何东西。
 
 退出码：0 = ①②③④⑤ 全过；非 0 = 有未过的项（明细见 stdout 与 <out>/b3.log）。
 """
@@ -134,6 +142,54 @@ def run_selftest():
     return 1 if bad else 0
 
 
+def _run_central(args, sess):
+    """调宿主侧中心设备脚本，同时**持续抽干串口**。
+
+    为什么是子进程而不是 import：pw_ble_central.py 会自己建 GLib 主循环收
+    D-Bus 信号，跟本脚本的串口采集（阻塞在 pyserial 上）混在一个进程里容易
+    互相饿死；分开跑，两边各自的日志都干净。
+
+    ⚠️ 为什么必须边等边 pump：中心设备连接/订阅/写命令的**同时**，设备正在
+    往串口吐 `[bt] B3 connected` / `ccc changed` / `cmd #` —— 这些正是本脚本
+    的判据。第一版用 subprocess.run() 死等，不读串口，结果设备侧证据全留在
+    tty 缓冲区里没被收走：宿主侧 9 项全 PASS，设备侧却报"手机没连上"。
+    串口取证器不读，就等于没有证据。
+    """
+    import subprocess
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(here, "pw_ble_central.py")
+    log(f"启动宿主侧中心设备：{script}")
+    pr = None
+    try:
+        pr = subprocess.Popen([sys.executable, script,
+                               "--timeout", str(args.central_timeout)],
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True)
+        deadline = time.time() + 180.0
+        while pr.poll() is None and time.time() < deadline:
+            sess.pump(0.3)
+        if pr.poll() is None:
+            log("中心设备脚本超时（180 s），终止")
+            pr.kill()
+        out = pr.communicate()[0] or ""
+        sess.pump(2.0)                    # 收尾：把设备最后几行读干净
+        print(out, flush=True)
+        try:
+            with open(os.path.join(args.out, "central.log"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(out)
+        except OSError as e:
+            log(f"中心设备日志留档失败：{e}")
+        return pr.returncode
+    except OSError as e:
+        log(f"中心设备脚本起不来：{e}（本机没有蓝牙控制器时会这样）")
+        return 127
+    finally:
+        if pr is not None and pr.poll() is None:
+            pr.kill()
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__ + "\n\n注意：本脚本在**电脑**上运行；手机只用来点 BLE 调试 App，"
@@ -148,6 +204,11 @@ def main():
     ap.add_argument("--no-reset", action="store_true")
     ap.add_argument("--selftest", action="store_true",
                     help="不碰板子：用合成日志测判定器本身（正/反两个方向）")
+    ap.add_argument("--central", action="store_true",
+                    help="不用手机：自动调用宿主侧 pw_ble_central.py 充当 BLE 中心设备"
+                         "（本机 hci0 可用时，B3 可以完全无人化跑完）")
+    ap.add_argument("--central-timeout", type=float, default=40.0,
+                    help="宿主侧中心设备的扫描/等超时（秒），默认 40")
     args = ap.parse_args()
 
     if args.selftest:
@@ -160,6 +221,7 @@ def main():
         log(f"致命：{args.port} 不存在（板子掉线？烧录与串口都会静默无输出）")
         return 2
 
+    central_rc = None
     sess = Session(args.port, args.baud, boot_timeout=60.0)
     try:
         if not args.no_reset:
@@ -185,18 +247,29 @@ def main():
                 "板子没在广播，别再试手机了；先看下面日志里有没有 'Unknown command: phywear'")
 
         log("=" * 68)
-        log("本脚本在**电脑**上跑；手机只需当一个蓝牙扫描/连接工具")
-        log("（手机不用装本项目的任何东西、不用跑任何脚本 —— 装个 nRF Connect /")
-        log(" LightBlue 之类的通用 BLE 调试 App 即可，商店直接搜）")
-        log("现在请用手机操作（脚本正在采集）：")
-        log("  1) 蓝牙扫描里按**名字**找 \"PhyWear\"（不要按 MAC）")
-        log("  2) 连接")
-        log("  3) 读特征 e0f1a001（16 B 传感器包）")
-        log("  4) 对 e0f1a001 打开 Notify")
-        log("  5) 往 e0f1a002 写 ASCII 命令，例如  ping")
-        log(f"窗口 {args.wait:.0f} 秒 ……")
-        log("=" * 68)
-        sess.pump(args.wait)
+        if args.central:
+            # 本机有蓝牙控制器（VM 直通 Intel AX201 → hci0）时，B3 不需要人：
+            # 宿主自己当 BLE 中心设备，把"手机点的那几下"原样做一遍。
+            # 判据仍是**设备侧串口原文**（本脚本的评估），宿主侧结论只作交叉印证。
+            log("本脚本在**电脑**上跑；--central：由电脑自己充当 BLE 中心设备")
+            log("（等价于手机上用 nRF Connect 点：按名字找 → 连接 → 读 a001 →")
+            log("  订阅 Notify → 往 a002 写 ping）")
+            log("=" * 68)
+            sess.pump(3.0)
+            central_rc = _run_central(args, sess)
+        else:
+            log("本脚本在**电脑**上跑；手机只需当一个蓝牙扫描/连接工具")
+            log("（手机不用装本项目的任何东西、不用跑任何脚本 —— 装个 nRF Connect /")
+            log(" LightBlue 之类的通用 BLE 调试 App 即可，商店直接搜）")
+            log("现在请用手机操作（脚本正在采集）：")
+            log("  1) 蓝牙扫描里按**名字**找 \"PhyWear\"（不要按 MAC）")
+            log("  2) 连接")
+            log("  3) 读特征 e0f1a001（16 B 传感器包）")
+            log("  4) 对 e0f1a001 打开 Notify")
+            log("  5) 往 e0f1a002 写 ASCII 命令，例如  ping")
+            log(f"窗口 {args.wait:.0f} 秒 ……")
+            log("=" * 68)
+            sess.pump(args.wait)
     finally:
         raw_path, log_path = dump(args.out, "b3", sess)
         text = bytes(sess.raw).decode("utf-8", "replace")
@@ -211,15 +284,22 @@ def main():
         mark = "PASS" if good else "FAIL"
         print(f"{mark:<6}{label:<18}{'' if good else hint}")
     print("-" * 68)
+    # --central：宿主侧也必须全过（设备说"我发了"≠ 对端真收到了 ——
+    # 句柄 0x0000 那个坑就是设备侧 rc=0、宿主侧一个包都收不到）。
+    if args.central:
+        good = (central_rc == 0)
+        print(f"{'PASS' if good else 'FAIL':<6}{'宿主侧中心设备全过':<18}"
+              f"{'' if good else '宿主侧有未过项 —— 见 central.log'}")
+        ok_all = ok_all and good
+        print("-" * 68)
     print(f"结论：{'✅ B3 通过（设备侧证据齐全）' if ok_all else '❌ B3 未通过（见上表）'}")
     print(f"日志：{log_path}\n原始：{raw_path}")
     with open(log_path, "rb") as fh:
         print(f"log sha256 = {hashlib.sha256(fh.read()).hexdigest()}")
 
     if ok_all:
-        out = os.path.join(args.out, "b3.log")
-        print("\n把上面这段 + 手机截图一起放进 docs/evidence/ 即可作为 B3 通过证据。")
-        _ = out
+        print("\nB3 通过证据 = 本目录下的 b3.log（设备侧串口原文）"
+              " + central.log（宿主侧中心设备 PASS 表）")
     return 0 if ok_all else 1
 
 
