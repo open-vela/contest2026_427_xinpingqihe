@@ -73,17 +73,87 @@ def evaluate(text):
     return rows, ok_all
 
 
+# ── 判定器自测（不需要板子/手机）─────────────────────────────────────────
+# 为什么要它：这个脚本**只在"没有手机"的方向上做过负对照**——万一手机那边
+# 一切正常、而这里正则/区间写错，人就会看到假 FAIL，还以为设备坏了。
+# 下面用合成日志把"应当 PASS"的方向也测一遍，顺带钉住几条关键语义。
+SELFTEST_CASES = [
+    ("理想情况：连上→订阅→写 ping", True, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] cmd #1 (8 B): 'selftest'
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+[bt] cmd: pong
+"""),
+    ("没连上（其余证据齐全）", False, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] cmd #1 (8 B): 'selftest'
+"""),
+    ("写入发生在连接之前 —— 那是自检写的，不能算", False, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] cmd #1 (8 B): 'selftest'
+[bt] ccc changed -> notify ON
+"""),
+    ("连上后通知报错 —— 要 FAIL", False, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+[bt] notify rc=-22
+"""),
+    ("先 OFF 后 ON（手机来回切过订阅）—— 仍应 PASS", True, """\
+[bt] B2 adv start rc=0 (ok)
+[bt] SELFTEST PASS (fails=0)
+[bt] B3 connected: 5A:58:62:96:E7:57 err=0
+[bt] ccc changed -> notify ON
+[bt] ccc changed -> notify OFF
+[bt] ccc changed -> notify ON
+[bt] cmd #2 (4 B): 'ping'
+"""),
+]
+
+
+def run_selftest():
+    bad = 0
+    for label, want, text in SELFTEST_CASES:
+        rows, got = evaluate(text)
+        mark = "PASS" if got == want else "FAIL"
+        if got != want:
+            bad += 1
+            det = ", ".join(f"{n}={'P' if g else 'F'}" for n, _, g, _ in rows)
+            print(f"{mark}  {label}  期望 {want} 实得 {got}  [{det}]")
+        else:
+            print(f"{mark}  {label}  期望 {want} 实得 {got}")
+    print("-" * 60)
+    print("判定器自测：" + ("✅ 全部符合预期" if bad == 0 else f"❌ {bad} 例不符"))
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", default="",
+                    help="证据落盘目录（--selftest 时不需要）")
     ap.add_argument("--port", default="/dev/ttyUSB0")
     ap.add_argument("--baud", type=int, default=1000000)
     ap.add_argument("--wait", type=float, default=240.0,
                     help="给人工操作留的窗口（秒），默认 240")
     ap.add_argument("--no-reset", action="store_true")
+    ap.add_argument("--selftest", action="store_true",
+                    help="不碰板子：用合成日志测判定器本身（正/反两个方向）")
     args = ap.parse_args()
+
+    if args.selftest:
+        return run_selftest()
+
+    if not args.out:
+        ap.error("需要 --out <目录>（除非用 --selftest）")
 
     if not os.path.exists(args.port):
         log(f"致命：{args.port} 不存在（板子掉线？烧录与串口都会静默无输出）")
