@@ -28,3 +28,18 @@
 [host-ppp]   设备请求 IP=0.0.0.0 ⇒ Nak 成 192.168.7.2
 [host-ppp] RX IPCP Configure-Request id=1 len=10 opts=0306c0a80702 [IP-Address=192.168.7.2]
 [host-ppp] TX IPCP Configure-Ack id=1 len=10 opts=0306c0a80702 [IP-Address=192.168.7.2]
+[host-ppp] RX LCP Echo-Request id=1 len=8 opts=00000000
+[host-ppp] TX LCP Echo-Reply id=1 len=8 opts=00000000
+[host-ppp] RX LCP Echo-Request id=2 len=8 opts=00000000
+[host-ppp] TX LCP Echo-Reply id=2 len=8 opts=00000000
+[host-ppp] RX IP 84 B payload=45000054000140004001ab54c0a80702c0a8070108007d68
+[host-ppp] TX IP 84 B payload=45000054000140004001ab54c0a80701c0a8070200008568
+[host-ppp]   ICMP Echo-Request ← 192.168.7.2 ⇒ 已回 Echo-Reply
+[host-ppp] RX IP 84 B payload=45000054000240004001ab53c0a80702c0a8070108007d67
+[host-ppp] TX IP 84 B payload=45000054000240004001ab53c0a80701c0a8070200008567
+[host-ppp]   ICMP Echo-Request ← 192.168.7.2 ⇒ 已回 Echo-Reply
+[host-ppp] RX LCP Echo-Request id=3 len=8 opts=00000000
+[host-ppp] TX LCP Echo-Reply id=3 len=8 opts=00000000
+[host-ppp] RX IP 84 B payload=45000054000340004001ab52c0a80702c0a8070108007d66
+[host-ppp] TX IP 84 B payload=45000054000340004001ab52c0a80701c0a8070200008566
+[host-ppp]   ICMP Echo-Request ← 192.168.7.2 ⇒ 已回 Echo-Reply
