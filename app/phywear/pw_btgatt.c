@@ -421,6 +421,32 @@ static int pw_btgatt_selftest(void)
       fails++;
     }
 
+  /* ④ 通知路径演练。
+   * 为什么需要：这条链（CCC 订阅 → 周期采样 → bt_gatt_notify）**只在有订阅者时**
+   * 才会跑，实验室里没有手机 ⇒ 它从来没被执行过；万一它坏在 B3 现场，表现就是
+   * "手机订阅了但一个包都收不到"，而且没有任何日志。
+   * 这里直接调一次 bt_gatt_notify()：
+   *   - 没有订阅者时，zblue 的 gatt_notify_mc() 初值就是 -ENOTCONN（已核对源码
+   *     host/gatt.c:3053），notify_cb 找不到 cfg->value == NOTIFY 的订阅者就不会改它；
+   *   - 手机订阅之后，**同一处的 rc 应该变成 0** —— 这就是 B3 要看的那条判据。
+   * 这一步证明"属性句柄能解析 + 调用链通"，并把期望值钉在日志里。 */
+  {
+    int nrc;
+
+    g_nfy_on = 1;
+    pw_sample_once(1);
+    nrc = bt_gatt_notify(NULL, &pw_attrs[PW_ATTR_SENSOR_VALUE], &g_pkt,
+                         sizeof(g_pkt));
+    g_nfy_on = 0;
+
+    printf("[bt] SELFTEST notify(无订阅者) rc=%d (期望 %d=-ENOTCONN；"
+           "手机订阅后这里应变成 0)\n", nrc, -ENOTCONN);
+    if (nrc != -ENOTCONN)
+      {
+        fails++;
+      }
+  }
+
   printf("[bt] SELFTEST %s (fails=%d)\n", fails == 0 ? "PASS" : "FAIL", fails);
   return fails;
 }

@@ -127,7 +127,7 @@ def main():
     need = ["[bt] bt_enable rc=0", "[bt] B2 gatt register rc=0",
             "[bt] B2 conn cb register rc=0", "[bt] B2 adv start rc=0",
             "[bt] B2 READY name=PhyWear", "[bt] SELFTEST PASS",
-            "SELFTEST decode", "sample took"]
+            "SELFTEST decode", "sample took", "SELFTEST notify"]
     for attempt in range(1, 4):
         label = "B_b1b2" if attempt == 1 else f"B_b1b2_try{attempt}"
         txt_b, log_b = run_phase(label, [(30.0, "phywear cap bt")])
@@ -151,6 +151,14 @@ def main():
     m = re.search(r"sample took (\d+) ms \(budget (\d+) ms\)", txt_b)
     rep.add("B2b 采样耗时已实测且在预算内",
             bool(m) and int(m.group(1)) <= int(m.group(2)),
+            m.group(0) if m else "未打印")
+
+    # 通知路径演练：没有订阅者时 bt_gatt_notify 必须回 -ENOTCONN。
+    # 这条链（CCC 订阅 → 周期采样 → notify）只在有订阅者时才跑，实验室里没有手机
+    # ⇒ 靠这个演练证明"属性句柄能解析 + 调用链通"，并钉住 B3 的期望值。
+    m = re.search(r"SELFTEST notify\(无订阅者\) rc=(-?\d+)", txt_b)
+    rep.add("B2b notify 演练 rc=-ENOTCONN(-107)",
+            bool(m) and int(m.group(1)) == -107,
             m.group(0) if m else "未打印")
 
     rep.add("B2b 全程无 RX 读错误", "rx read errno" not in txt_b)
