@@ -217,3 +217,5 @@ int  pw_ui_demo_step(void);
 bool pw_ui_demo_done(void);
 
 #endif /* __APPS_EXAMPLES_PHYWEAR_UI_H */
+
+int pw_bt_init(void);

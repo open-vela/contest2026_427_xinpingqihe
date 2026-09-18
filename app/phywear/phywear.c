@@ -624,6 +624,7 @@ int pw_cap_open(const char *name)
 {
   lv_obj_t *scr = NULL;
 
+  if (strcmp(name, "bt") == 0) { pw_bt_init(); return 1; }
   if      (strcmp(name, "root")      == 0) { pw_ui_root(); return 1; }
   else if (strcmp(name, "voice")     == 0) scr = pw_voice_screen();
   else if (strncmp(name, "board", 5) == 0 && name[5] >= '0' && name[5] <= '5')
