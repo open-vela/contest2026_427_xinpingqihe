@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 13:02:36",
- "generated_at_epoch": 1789707756,
+ "generated_at": "2026-09-18 13:08:12",
+ "generated_at_epoch": 1789708092,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 209,
   "critical": 132,
-  "bytes": 9049265,
+  "bytes": 9050431,
   "missing_in_workspace": 0
  },
  "files": [
@@ -502,8 +502,8 @@
    "dst": "apps/examples/phywear/pw_btgatt.c",
    "compare": "exact",
    "critical": true,
-   "md5": "3ac8664b03320c23e1737991ed2462e8",
-   "size": 8184,
+   "md5": "c13c03d2741b10e6a4bd6ecc5b26780c",
+   "size": 9273,
    "present": true
   },
   {
@@ -1404,8 +1404,8 @@
    "dst": "vendor/sifli/boards/sf32lb52/sf32lb52_lchspi_ulp/configs/nsh-ai/defconfig",
    "compare": "exact",
    "critical": true,
-   "md5": "06993ddef36a58066f5a29221ea12ca6",
-   "size": 9468,
+   "md5": "9b3680715fccaab6e52ce61e37859b4d",
+   "size": 9545,
    "present": true
   },
   {

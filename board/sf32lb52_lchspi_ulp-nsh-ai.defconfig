@@ -69,8 +69,8 @@ CONFIG_BT=y
 # 要省这 2 KB 就把下面两行去掉；但注意本树 cmake 的 nuttx_export_kconfig 在符号
 # "消失"时会 configure 失败（string(REGEX MATCH) 拿到空参数），实测需清掉 build
 # 目录重新配置，别只改 defconfig。
-CONFIG_BT_DEBUG_LOG=y
-CONFIG_BT_DEBUG_LOG_LEVEL=4
+# （已关闭以省 2,096 B SRAM；排障时把下面两行加回来并重跑 resetconfig）
+# CONFIG_BT_DEBUG_LOG is not set
 CONFIG_BT_CLASSIC=y
 CONFIG_BT_H4=y
 CONFIG_BT_EXT_ADV=y

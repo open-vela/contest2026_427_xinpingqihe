@@ -29,6 +29,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 
 #include "phywear_sensors.h"
@@ -185,6 +186,34 @@ static void pw_sample_work_handler(struct k_work *work)
   k_work_reschedule(&g_sample_work, K_MSEC(PW_SAMPLE_MS));
 }
 
+/* ── 连接事件 ──────────────────────────────────────────────────────────
+ * B3 是**人工**验证（手机连），所以设备侧必须把"连上了/断了"打到串口上，
+ * 否则只能靠手机屏幕，串口证据链是空的。 */
+
+static void pw_connected(struct bt_conn *conn, uint8_t err)
+{
+  char addr[BT_ADDR_LE_STR_LEN];
+
+  bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+  printf("[bt] B3 connected: %s err=%u\n", addr, err);
+  g_nfy_on = 0;
+}
+
+static void pw_disconnected(struct bt_conn *conn, uint8_t reason)
+{
+  char addr[BT_ADDR_LE_STR_LEN];
+
+  bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+  printf("[bt] B3 disconnected: %s reason=0x%02x\n", addr, reason);
+  g_nfy_on = 0;
+}
+
+static struct bt_conn_cb pw_conn_cb =
+{
+  .connected = pw_connected,
+  .disconnected = pw_disconnected,
+};
+
 /* ── 广播数据 ───────────────────────────────────────────────────────── */
 
 static const struct bt_data pw_ad[] =
@@ -219,6 +248,9 @@ int pw_btgatt_start(void)
     }
 
   k_work_init_delayable(&g_sample_work, pw_sample_work_handler);
+
+  rc = bt_conn_cb_register(&pw_conn_cb);
+  printf("[bt] B2 conn cb register rc=%d\n", rc);
 
   rc = bt_le_adv_start(BT_LE_ADV_CONN, pw_ad, ARRAY_SIZE(pw_ad), pw_sd,
                        ARRAY_SIZE(pw_sd));
