@@ -1,13 +1,13 @@
 {
  "schema": 1,
- "generated_at": "2026-09-18 13:58:28",
- "generated_at_epoch": 1789711108,
+ "generated_at": "2026-09-18 14:02:30",
+ "generated_at_epoch": 1789711350,
  "workspace_default": "/home/xpqh/openvela",
  "repo_default": "/home/xpqh/work/contest2026_427_xinpingqihe",
  "stats": {
   "files": 210,
   "critical": 133,
-  "bytes": 9064065,
+  "bytes": 9065349,
   "missing_in_workspace": 0
  },
  "files": [
@@ -876,8 +876,8 @@
    "dst": "apps/external/zblue/zblue/port/drivers/bluetooth/hci/h4.c",
    "compare": "exact",
    "critical": true,
-   "md5": "7f54d518c225c9bcc48c3e0d2c8ccd4f",
-   "size": 14863,
+   "md5": "1b5c407d9f02e6adb89cc81c83020d5f",
+   "size": 16147,
    "present": true
   },
   {

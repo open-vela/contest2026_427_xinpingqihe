@@ -66,6 +66,9 @@ struct h4_data {
 	 * 所以：h4_send() 只把 buf 挂进这个队列，真正的 fd I/O 全部交给
 	 * h4_rx_thread（它是 h4_open() 亲手创建的，与 open 同组、共享 fd 表）。 */
 	struct k_fifo tx_fifo;
+
+	/* RX 连续读错误计数（瞬时错误重试用；成功一次就清零） */
+	unsigned int rx_errs;
 #if (CONFIG_BLUETOOTH_SERVICE_LOG_LEVEL > 2 || CONFIG_BT_DEBUG_LOG > 2)
 	K_KERNEL_STACK_DEFINE(rx_thread_stack, RX_THREAD_STACK_DEBUG_MODE_SIZE);
 #else
@@ -84,6 +87,9 @@ struct h4_data {
  * 这正是本次根因的决定性证据（见 docs/16）。
  */
 #define PW_H4_TRACE 0
+
+/* RX 连续读失败多少次才放弃线程（见 h4_rx_thread 里的错误处理） */
+#define PW_H4_RX_ERR_MAX 50
 
 #if PW_H4_TRACE
 #define PW_H4_DUMP_MAX 64
@@ -315,19 +321,36 @@ static void h4_rx_thread(void *p1, void *p2, void *p3)
 				continue;
 			}
 
-			if (len == -EAGAIN) {
+			/* ⚠️ 原代码这里是 `if (len == -EAGAIN)` —— **永远为假**：
+			 * read() 出错返回 -1，EAGAIN 在 errno 里。于是任何一次瞬时读错误
+			 * 都会直接掉到下面的 close(fd) + return。
+			 * 而本驱动现在把 **TX 也交给这个线程**（见 h4_send 的注释），
+			 * 所以一旦走到那里：RX 线程没了、fd 关了、TX 也发不出去 ——
+			 * 整个蓝牙栈静默死亡。更糟的是出货配置没开 CONFIG_BT_DEBUG_LOG，
+			 * LOG_ERR 被编译成空语句，连一行提示都没有，B3 时只会表现为
+			 * "手机突然连不上/读不到"，极难归因。
+			 * 现在：EAGAIN 重试；其它错误只累计"连续失败"，先重试，
+			 * 连续 PW_H4_RX_ERR_MAX 次才放弃，并且用**无条件 printf** 留原文。 */
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				usleep(500);
 				continue;
 			}
 
-			LOG_ERR("Reading hci failed, errno %d", errno);
-#if PW_H4_TRACE
-			printf("[H4] rx read FAILED errno=%d -> close(fd %d)\n", errno, h4->fd);
-#endif
+			if (++h4->rx_errs < PW_H4_RX_ERR_MAX) {
+				printf("[H4] rx read errno=%d (第 %u 次)，重试\n", errno,
+				       (unsigned int)h4->rx_errs);
+				usleep(1000);
+				continue;
+			}
+
+			printf("[H4] rx read 连续失败 %u 次 (errno=%d) —— 放弃并退出 RX 线程；"
+			       "此后 RX / TX 都会停\n", (unsigned int)h4->rx_errs, errno);
 			close(h4->fd);
 			h4->fd = -1;
 			return;
 		}
+
+		h4->rx_errs = 0;
 
 		frame_size += len;
 
