@@ -53,7 +53,7 @@
 ### 3.2 两条安装路径
 
 - **路径 A（本项目采用）**：PhyWear 开机自动安装。真机 `/data` 是 tmpfs，重启即空，因此由 `pw_skill.c` 在启动时把 Skill 写进 `/data/agent/skills/`；内容一致时不重写（不触发 Agent 热加载）。Skill 正本经 `tools/phywear/gen_skill_blob.py` 生成 C 字符串随固件编译，`--check` 可做漂移自检。
-- **路径 B（官方 CLI，对照）**：`install_skill <name> <https-url|->`（支持从控制台粘贴正文）；真机无网络栈，故仅在有网环境（模拟器）可用。
+- **路径 B（官方 CLI，对照）**：`install_skill <name> <https-url|->`（支持从控制台粘贴正文）；真机无互联网出口，故仅在有网环境（模拟器）可用。
 
 ### 3.3 实测（2026-09-13）
 

@@ -33,7 +33,7 @@
 
 - 费用（`cost-*.csv` 合计）：**327.98 CNY**。
 - **说明**：DSH **不在赛事官方支持的 4 种 AI 工具之列**（官方为 claude-code / opencode / codex / kiro），
-  因此**不计入 `logs/` 的 AI 工时统计**；其会话日志已作为补充佐证提交：
+  其会话日志已放在 `supplementary/dsh-logs/`，**仅补充佐证 AI**：
   `supplementary/dsh-logs/`（原始事件子集 + 可读摘要）。
 
 > **数据新鲜度**：本目录的 DSH 台账为 **2026-09-18 导出**。比赛期间用量仍在增长，
