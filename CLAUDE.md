@@ -42,7 +42,7 @@
 | **UI v2 改版 + BUG 修复（2026-09-17，用户反馈驱动）** | ①**修掉真 BUG**：板块列表只剩 1 行 —— `pw_motion_slide_in_y_at()` 内部读 `lv_obj_get_y()` 当动画终点，而 LVGL v9 里 `lv_obj_set_y` 只写样式 Y、`lv_obj_get_y` 读已布局 coords，新建行尚未布局 ⇒ **N 行终点算成同一个 y 而完全重叠**；改为**显式传 base y** + 动画前落到起点 + 无延时版用 `lv_obj_get_y_aligned()`；行高 76→64px（5 行才放得进内容区）。②**交互补强**：按压反馈改成**样式**（`pw_press_style()` 挂在 `pw_card_new()` 上：translate_y+3px + 底色 Muted + 120ms C4）⇒ 全 App 统一；新增 `pw_deco()` 修掉「装饰子件抢走按压状态」；切屏转场（`pw_topbar` 内容区 +16px 落位 C2 260ms）、主页宫格错峰入场、多页屏动画滚动。③**视觉**：HTML 设计稿（`docs/design/phywear-ui-v2-mockup.html`）→ 卡片 1px hairline 描边、图标块圆角方块、原始页章节条；修掉频谱页「x:频率」压按钮。**数字（cap raw，30s 心跳）**：208 → **197 loops/s，fps 全程 12 不变**（关描边 203；读数页 v2 版式再 −2.5%）⇒ **帧率不退化**；flash **2,487,452 B**，SRAM **489,136 B 不变**。另：读数页 v2 版式（大数字 + 右侧单位列 + 行间 hairline + 实时点，单位从数值串挪出）。另：**24 处页头批量接入 3px 强调条**（`pw_section_bar()`）+ **标尺计数 D1 脉冲**（只在计数增加时脉冲一次，200ms，避免常驻动画）。回退 tag `pre-ui-redesign-20260917`，宏 `PW_UI_MOTION=0`/`PW_CARD_LINE=0`。**已做**：读数页 v2 版式、24 处实验页页头强调条、标尺 D1 状态脉冲、设置页章节条、倾角图卡轴标签压控件修复（与频谱页同型）。**未做**：关于/AI 教练页版式、**按压手感待人工确认**。见 `docs/evidence/ui-v2-20260917/README.md` |
 | 真机固件（UI 线，历史） | 板上（**2026-09-18 蓝牙打通前的口径**）= **UI v2 构建（含读数页 v2 版式）**（**2,487,452 B** / flash 14.82% / SRAM **489,136 B**；本地产物 md5 `47d8e9248f8c12cc0d182d57f1afcdd4` —— ⚠️ 固件**非可重现**，md5 只在「板上 vs 同一产物」时有意义）。含蓝牙阶段 A、P1-2 动效查表（151 vs 2088 ns/次）、P0 主循环自适应休眠、UI v2（色板 + 统一按压态 + 切屏转场 + hairline 描边 + 读数页大数字/单位列/实时点 + 24 处页头强调条 + 标尺 D1 脉冲 + 设置页章节条）。⚠️ `flash_with_ftab.sh` 读回校验会把 `sftool` 读取**超时**误报成「固件 ❌ 不一致」（stderr 被 `>/dev/null` 吞掉），本轮复现多次，实际写入正常（板子正常启动跑 GUI，截图已核）。更早回退点 `~/桌面/PhyWear-rollback-20260915-0002/` |
 | 板子 | 立创·黄山派 SF32LB52-MOD-1-N16R8；`/dev/ttyUSB0` @1000000 8N1 —— 09-15 22:1x 短暂掉线后恢复；09-16 21:08 重新插拔后恢复，动效真机计时与截图验证已补齐（`docs/evidence/motion-20260916/`） |
-| AI 日志 | `logs/XPQHyue/` **50 会话 / 15,283 事件**，`validate-log.py` ✅ ALL OK |
+| AI 日志 | `logs/XPQHyue/` **54 会话 / 15,761 事件 / 12.2 MiB**（2026-08-26 ~ 09-18），`validate-log.py` ✅ ALL OK |
 | **v3 完全重构：设计阶段（2026-09-17）** | 用户批准 UI v2 并冻结，新增两个回退锚点：tag **`pre-full-redesign-20260917`**（= UI v2，HEAD `ab289ec`）与整包回退点 **`~/桌面/PhyWear-rollback-20260917-2140/`**（含板上固件 `47d8e924…` 与 state.json）。重构方向：**抛弃等权 2×4 宫格**，改横向卡片流（中心聚焦 + 液态指示器 + 磁吸吸附 + 速度形变 + 视差背景）、进出页改**共享元素展开**、返回改**右拖手势转场**（保留按钮）、分页由圆点改**液态指示器**、迷你图可**展开全屏**。交互选型依据用户提供的 `spt-tactile-interactions` 描述（8 种质感动效）：**选 6 弃 2**（3D 视差、碰撞推挤不选，理由见原型右侧面板）。**先出网页交互原型供评审**：`docs/design/phywear-v3-prototype.html`（可拖动；`?still=1#cat` 等为静态取证入口），渲染图 `docs/design/v3-0{1,2,3}-*.png`。**v3.1（同日，按用户反馈迭代）**：① 主页改为 **一屏 8 格 + 指下聚焦**（按住滑动→聚焦跟手+磁吸+8 槽液态指示器同步，抬起进入），
 即"8 大模块一次性全部可按到"同时保留"有当前项/有方向/有磁吸"；② **板块页重做**（hero 渐晕 + 图标块 + 24px 标题 + 规模胶囊 + 序号/3px 强调轨/元信息/「开始」胶囊 + 规划项弱化）。
 用户已确认两项降级：中心聚焦不做真缩放（→框宽高+邻项降透明+描边）、速度形变不做 skew（→强调条伸缩+卡片宽度微变）。
@@ -76,7 +76,7 @@
 5. **只许 rebase**：不许产生 merge commit；提交作者固定 `XPQHyue <15770782523@163.com>`。
 6. **改完必须回仓**：工作区（`~/openvela`）改动要 `sync_back.py --execute` + 重生成 `manifest.json`，否则评审 clone 看不到。
 7. **数据可追溯**：每个数字都要指到代码/日志/证据；**模拟器数据 ≠ 真机测量**；未实现不得写成已实现（写进「已知限制」不扣分）。
-8. **归属如实**：EPIC 硬件加速来自官方 PR #31/#41/#121（非本队原创）；phyphox 仅灵感来源（见 `app/phywear/NOTICE.md`）；主动场景**默认开启**（`PW_WATCH_PROACTIVE 1`，推送走受保护的 `pw_ai_ask()`，Agent 不在时不 panic）；`ai_agent` 已开机自启；真机无网络栈。
+8. **归属如实**：EPIC 硬件加速来自官方 PR #31/#41/#121（非本队原创）；phyphox 仅灵感来源（见 `app/phywear/NOTICE.md`）；主动场景**默认开启**（`PW_WATCH_PROACTIVE 1`，推送走受保护的 `pw_ai_ask()`，Agent 不在时不 panic）；`ai_agent` 已开机自启；蓝牙已打通（GATT + 文本回环 + 手表串口页，设备侧 18/18、宿主 B3 6/6+9/9），PPP over BLE 端到端联通 IP（实验性，设备 `ping 3/3`）；真机**无 WiFi 网卡/无互联网出口**（网络仅 BLE→PPP 到宿主）。
 
 9. **PR 合并后必须先把本地 rebase 到官方最新再继续**：rebase-merge 会改写 SHA，本地若还带着旧 SHA 的提交，
    新 PR 会显示成"重复提交 + 冲突"（`mergeable=false / dirty`）。正确顺序：
@@ -88,7 +88,7 @@
 ```bash
 bash .claude/skills/phywear-migrate/finish_session.sh
 ```
-把本次 Claude Code 会话导出到 `logs/XPQHyue/<日期>/` 并校验。**白名单工具只有 claude-code / codex / opencode / kiro**；DSH 不计，只能作补充证据。
+把本次 Claude Code 会话导出到 `logs/XPQHyue/<日期>/` 并校验。**白名单工具只有 claude-code / codex / opencode / kiro**；DSH 会话置于 `supplementary/`，仅补充佐证 AI。
 
 ## 4. 常用命令
 

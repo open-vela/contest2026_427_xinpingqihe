@@ -109,12 +109,12 @@
 |---|---|---|---|
 | ① | **新传感器/音频驱动（硬件适配核心）** | MMC5603 地磁（含 auto-SR 偏置修复）、LTR-303 环境光、LSM6DSL 适配 3 个 NuttX 传感器驱动 + **AUDCODEC 麦克风（DMA 采集）与扬声器（DAC0+PA）通路**；已提 **nuttx PR #378**（checkpatch/CLA 通过） | 传感器驱动 **3,321 行**（`src/nuttx`）+ 音频驱动 **803 行** |
 | ② | **触控适配** | 在官方 EPIC 显示栈上修复 FT6146 电容触控，使 UI 可交互 | `sf32lb52_mic` 之后的 `6073074` 提交 |
-| ③ | **PhyWear 应用** | LVGL 全中文腕上物理工坊：主菜单 **8 板块**、`phywear cap` 可截 **17 个主页面**（原始传感器 6 子页、力学 4、声学 4（2 实现 + 2 规划）、工具 5、计时 3、生活 1）+ 惯性标尺/标定 4 子页 + 蓝牙页 + AI 教练页 | **69 个手写源文件 / 25,373 行**（另有 5 个生成的 CJK 字体文件） |
+| ③ | **PhyWear 应用** | LVGL 全中文腕上物理工坊：主菜单 **8 板块**、`phywear cap` 可截 **17 个主页面**（原始传感器 6 子页、力学 4、声学 4（2 实现 + 2 规划）、工具 5、计时 3、生活 1）+ 惯性标尺/标定 4 子页 + 蓝牙页 + AI 教练页 | **69 个源文件 / 25,373 行**（68 个手写 + 1 个由 Skill markdown 生成的数据块 `pw_skill_blob.c`；另有 5 个生成的 CJK 字体文件） |
 | ④ | **物理算法与图表库（自研）** | radix-2 FFT、自相关测周期、向心 a-ω² 最小二乘、Mahony 姿态解算（`pw_ahrs`）、六面法/磁椭球/零偏标定（`pw_calib`）；自研实时曲线控件 `pw_graph`/`pw_scope` + 动效查表（`pw_motion*`） | **约 4,256 行** |
 | ⑤ | **性能工程** | 弃用 lv_chart，走通 **EPIC IMAGE 硬件 blit** 路径 → 真机 **3 → 39/48 FPS**（官方 benchmark 39 / 本队页面 48–49；09-12 历史口径 43）；**第二次优化**（主循环自适应休眠）静置态实时页再 **+30.8%**、刷新率 41→**63**；实测**否决 6 个假设**并定案**面板 60 Hz 硬上限**；同一优化使**模拟器**从“很卡” → **22–23 FPS** | `docs/evidence/p0-20260916/`、`docs/evidence/lvbench-20260916/` |
-| ⑥ | **国际化（i18n/CJK）** | EN/ZH 双语言字符串表 **各 282 条（共 564 条）**；Montserrat + Droid 子集生成 **5 档 CJK 字体**（14/16/20/24/28px，**493 个 CJK 码点**，脚本实测） | 表 + 5 字体（`tools/phywear/gen_fonts.sh` 可重生成） |
+| ⑥ | **国际化（i18n/CJK）** | EN/ZH 双语言字符串表 **各 282 条（共 564 条）**；Montserrat + Droid 子集生成 **5 档 CJK 字体**（14/16/20/24/28px，**535 个 CJK 码点**，脚本实测 2026-09-19） | 表 + 5 字体（`tools/phywear/gen_fonts.sh` 可重生成） |
 | ⑦ | **工程化与验证** | 自建 **goldfish-phywear 模拟器板级配置**；bench 注入 + FPS/空闲堆统计；中文界面截图证据；git 标签回归 | 模拟器配置 + bench 工具 |
-| ⑧ | **AI 辅助开发** | Claude Code + Codex **54 个官方会话 / 15,761 事件**（`validate-log.py` ✅ ALL OK）+ 自建 **Skill ×4** | `logs/XPQHyue/`；DSH 摘要见 `supplementary/dsh-logs/`（不计工时） |
+| ⑧ | **AI 辅助开发** | Claude Code + Codex **54 个官方会话 / 15,761 事件**（`validate-log.py` ✅ ALL OK）+ 自建 **Skill ×4** | `logs/XPQHyue/`；DSH 摘要见 `supplementary/dsh-logs/`（**仅补充佐证 AI**） |
 
 > **一句话**：官方给了 EPIC "发动机"，本队完成了**传感器驱动、物理算法、完整应用、性能调优、国际化、工程验证**——把黄山派真正做成一台可用的腕上物理工坊。
 
@@ -214,7 +214,7 @@
 
 ```
 contest2026_427_xinpingqihe/
-├── app/phywear/              # ⭐ PhyWear 应用源码（LVGL：69 手写源文件 / 25,373 行 + 5 生成字体 + skills/ + NOTICE.md）
+├── app/phywear/              # ⭐ PhyWear 应用源码（LVGL：69 源文件 / 25,373 行（68 手写 + 1 生成数据块）+ 5 生成字体 + skills/ + NOTICE.md）
 ├── src/                      # ⭐ 公共仓改动快照（逐文件来源见 src/MANIFEST.md）
 │   ├── nuttx/                #   [本队原创] 传感器驱动 mmc5603 / ltr303（+ lsm6dsl 适配）+ 头文件
 │   ├── vendor/sifli/         #   黄山派 BSP + [官方PR#31] EPIC 芯片层 + [本队] defconfig / 音频驱动 / 启动时序
@@ -233,7 +233,7 @@ contest2026_427_xinpingqihe/
 │   ├── token_usage/          #   Token 用量证据（MiMo xlsx + DSH CSV）
 │   └── PhyWear_技术报告_官方模板.docx
 ├── logs/XPQHyue/             # ⭐ AI Coding 日志（claude-code / codex，官方格式，54 会话 / 15,761 事件，validate-log ✅）
-├── supplementary/dsh-logs/   # 补充佐证：DeepSeek Harness 会话摘要（非白名单工具，不计工时）
+├── supplementary/dsh-logs/   # 仅补充佐证 AI：DeepSeek Harness 会话摘要
 ├── third_party/ui-ux-pro-max/# 上游 UI/UX 数据（MIT，v2.15.0）+ 本队新增 stacks/lvgl.csv
 ├── CLAUDE.md                 # 项目记忆（角色分工 / 铁律 / 常用命令）—— AI 会话必读
 ├── JUDGES.md                 # 评委复现指南（三条路径 + 5 分钟验收清单）
@@ -319,7 +319,7 @@ PY
 - **调试**：FPS 探针、bench 注入、崩溃 triage（SFBL 卡死、触控、帧缓冲冻结定位）均借助 AI。
 - **文档**：README / 报告 / 本说明由 AI 协助整理。
 
-**完整对话日志**见 `logs/XPQHyue/`（claude-code + codex，**54 个会话 / 15,761 条事件 / 13 MB**，官方 `validate-log.py` 输出 **✅ ALL OK**）。
+**完整对话日志**见 `logs/XPQHyue/`（claude-code + codex，**54 个会话 / 15,761 条事件 / 12.2 MiB**，官方 `validate-log.py` 输出 **✅ ALL OK**）。
 
 **Token 用量（真实数据）**：
 
@@ -334,14 +334,14 @@ PY
 
 > **如实声明**：我们另通过 **DeepSeek Harness** 进行过规划与长周期任务。它**不在官方
 > 支持的 4 种工具（claude-code / opencode / codex / kiro）之列**，其会话**无法导入官方
-> 事件 schema**（`event.schema.json` 的 `tool` 枚举不含 harness），因此**未计入 `logs/`**，
-> 不计入 AI 工时统计（其 **4,197,874,171 tokens** 用量已如实单列）。本仓 AI Coding 日志仅含
-> 官方支持工具（claude-code / codex）的实际会话。为体现该通道的开发过程与工作量，特将 DSH 会话
-> 整理为可读摘要置于 `supplementary/dsh-logs/DSH_SESSIONS_SUMMARY.md`（**仅补充佐证，不计 AI 官方分**）。
+> 事件 schema**（`event.schema.json` 的 `tool` 枚举不含 harness），因此其会话置于
+> `supplementary/dsh-logs/`，**仅补充佐证 AI**；其 **4,197,874,171 tokens** 用量已如实单列。
+> 本仓 AI Coding 日志仅含官方支持工具（claude-code / codex）的实际会话。为体现该通道的开发过程与
+> 工作量，特将 DSH 会话整理为可读摘要置于 `supplementary/dsh-logs/DSH_SESSIONS_SUMMARY.md`。
 
 ---
 
-> **队内协作模式（2026-09-14）**：主力为 DeepSeek Harness（实现/构建/烧录/真机验证/文档/提交）；Claude Code + 小米 MiMo 在本机以**辅助**身份参与（独立复核、二次校对、产出可入 `logs/` 的日志）。`logs/` 只收白名单工具的真实会话，**禁止为凑数刷日志**；DSH 记录放 `supplementary/dsh-logs/` 并不计工时。项目记忆见根目录 `CLAUDE.md`。
+> **队内协作模式（2026-09-14）**：主力为 DeepSeek Harness（实现/构建/烧录/真机验证/文档/提交）；Claude Code + 小米 MiMo 在本机以**辅助**身份参与（独立复核、二次校对、产出可入 `logs/` 的日志）。`logs/` 只收白名单工具的真实会话，**禁止为凑数刷日志**；DSH 记录放 `supplementary/dsh-logs/`，**仅补充佐证 AI**。项目记忆见根目录 `CLAUDE.md`。
 
 ## 六、自建 Skill
 
@@ -416,8 +416,9 @@ PY
 
 ### 2. 网络：硬件限制与实验性通路
 - 本板**无 WiFi 网卡**（运行时 `ifconfig: open failed: 2`，厂商树无任何 WiFi 驱动）⇒ `set_wifi`/DHCP 不可达。
-- 已用 **PPP over BLE 绕过**（2026-09-18 实测 N1/N2 达成：`ppp0` RUNNING / `ping 3/3`），但仍受
-  **SRAM 余量与蓝牙吞吐**限制，属**实验性通路**；USB CDC-ACM + SLIP 软件侧已就绪，**需插 USB 数据线**才能实测。
+- 已用 **PPP over BLE 绕过**（2026-09-18 实测 N1/N2 达成：`ppp0` RUNNING / `ping 3/3`，一键判定 6/6），
+  属**实验性通路**（宿主侧需跑用户态 PPP 对端，不代表有互联网出口）；USB CDC-ACM + SLIP 软件侧已就绪，**需插 USB 数据线**才能实测。
+  原先"SRAM 不够"的障碍已解决（工作队列/PPP 栈改从堆上要，出货 SRAM 反而比加蓝牙前低约 13 KB）。
 
 ### 3. 「主动+执行」场景的残余问题
 - 晃动 → 自动跑单摆实验**已交付并默认开启**，但**静止/振动桌面上单摆页仍可能给出无效 g**：

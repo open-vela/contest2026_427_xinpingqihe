@@ -2,7 +2,7 @@
 
 > ⚠️ **诚实声明**：本目录为 **DeepSeek Harness (DSH)** 开发会话的**补充佐证材料**。
 > DSH **不在官方支持的 4 种 AI 日志工具之列**（官方为 `claude-code` / `opencode` / `codex` /
-> `kiro`），其会话**无法导入官方 `event.schema.json`**，因此 **不计入 `logs/` 的 AI 工时统计**。
+> `kiro`），其会话**无法导入官方 `event.schema.json`**，因此其会话放在 `supplementary/dsh-logs/`，**仅补充佐证 AI**。
 > 这里仅作为开发过程/工作量的辅助说明，供评委参考。
 
 ## 内容

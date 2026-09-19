@@ -38,4 +38,4 @@
 [`../DSH_SESSIONS_SUMMARY.md`](../DSH_SESSIONS_SUMMARY.md)。两者配套：**摘要概览 → 原始子集逐行核实**。
 
 > ⚠️ DSH 非官方支持日志工具（官方为 claude-code/opencode/codex/kiro），
-> **不计入官方 `logs/` 的 AI 工时统计**；本目录及摘要仅作开发过程/工作量佐证。
+> 本目录及摘要**仅补充佐证 AI**（开发过程 / 工作量）。

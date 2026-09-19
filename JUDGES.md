@@ -57,7 +57,7 @@ picocom -b 1000000 --noreset --lower-rts --lower-dtr /dev/ttyUSB0
 串口里输入：
 
 ```text
-nsh> ai_agent &          # 起 AI Agent（真机无网络，走端侧离线意图 + 工具）
+nsh> ai_agent &          # 起 AI Agent（真机无互联网出口，走端侧离线意图 + 工具）
 nsh> phywear lang zh     # 起中文界面（GUI 会占住控制台，之后用触摸操作）
 ```
 

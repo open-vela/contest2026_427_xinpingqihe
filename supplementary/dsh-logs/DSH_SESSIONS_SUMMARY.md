@@ -1,7 +1,7 @@
 # DeepSeek Harness (DSH) 开发会话汇总
 
 > 补充佐证材料。DSH 非官方支持日志工具（官方为 claude-code/opencode/codex/kiro），
-> 故**不计入** 官方 logs/ 工时统计；此处仅作工作量/开发过程佐证。
+> 此处**仅补充佐证 AI**（工作量 / 开发过程）。
 > 会话由 `session.jsonl`（每行 JSON 事件）pythonscript 提取，保留原始时间/内容。
 
 ## session-14c7863f-d780-4334-9036-9030cb9e2272
