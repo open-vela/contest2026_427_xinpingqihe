@@ -59,13 +59,13 @@
 
 **性能与平台（如实说明，勿误解为"模拟器也 43 FPS"）**：
 - **EPIC 硬件加速来自官方 PR #31/#41/#121（非本队自研）**；本队在其基础上集成优化（见下方"工作基础与归属"）。
-- **真机（黄山派 SF32LB52）**：官方 EPIC GPU 硬件加速 + 本队 UI/算法层优化 → 全场景平均 **43 FPS**（2026-09-12 固件 benchmark 口径）；加入 AI Agent + 声学功能后的当前固件实测 **41 FPS**（render 22 / flush 0）；未优化前约 3 FPS。
+- **真机（黄山派 SF32LB52）**：官方 EPIC GPU 硬件加速 + 本队 UI/算法层优化 → 全场景平均 **43 FPS**（2026-09-12 固件 benchmark 口径）；加入 AI Agent + 声学功能后实测 **41 FPS**（render 22 / flush 0）；**第二次优化（09-16，主循环自适应休眠）**：实时页重绘帧率 26/28 → **34/36（+30.8%）**、主屏显示刷新率 41 → **63**（面板 60 Hz 物理上限），并实测否决 6 个假设（`docs/evidence/p0-20260916/`）；未优化前约 3 FPS。
 - **模拟器（goldfish-arm64-v8a，无 EPIC 硬件、纯软件渲染）**：经本队 **UI/算法层优化**（弃用 lv_chart、自研 pw_scope/pw_graph 的 CPU 光栅 + lv_image 路径）后由"原本非常卡"提升到 **22–23 FPS** 稳定。
 - 即：**40+ FPS 需真机硬件 + 官方 EPIC 后端**；评委无板时以**代码 + 实测证据**（`docs/03_技术报告.md`、`docs/project/fps_timeline.png`）核验。
 - EPIC 使能配置：`sf32lb52_lchspi_ulp/configs/nsh/defconfig`（`CONFIG_BSP_USING_EPIC=y` + `CONFIG_LV_USE_SIFLI_EPIC=y`）。
 
 **未实现（规划中，如实标注，不冒充）**：
-- 端侧运动识别与主动交互（运动模式识别 / 主动弹建议 / 语音快捷启动）——**未实现**（i18n 标"教练规划中"）。
+- 端侧运动识别（运动模式识别 / 语音快捷启动）——**未实现**；但**「摆动 → 自动跑实验」的主动+执行场景已交付并默认开启**（`PW_WATCH_PROACTIVE 1`，`ai_agent` 开机自启）。
   另：**openvelaClaw（官方 `packages/ai_agent`）已集成并在真机验证**：4 个 PhyWear 工具注册成功、
   自定义 Skill 自动装到 `/data/agent/skills/`、Agent loop 开机即启动（详见 [`docs/05_AI_Agent与Skill.md`](docs/05_AI_Agent与Skill.md)）。
   「摆动 → 自动跑实验」的**主动 + 执行场景已交付并真机验证**（`PW_WATCH_PROACTIVE 1`，`ai_agent` 开机自启）：
@@ -103,7 +103,7 @@
 | ② | **触控适配** | 在官方 EPIC 显示栈上修复 FT6146 电容触控，使 UI 可交互 | `sf32lb52_mic` 之后的 `6073074` 提交 |
 | ③ | **PhyWear 应用** | LVGL 全中文腕上物理工坊：**16 个主页面**（原始传感器 **6 页**、力学 3、声学 2、工具 **5**（含「水平仪」，2026-09-15 接入）、计时 4、设置/关于等）+ 水平仪/标定 4 子页 | **50 个手写源文件 / 19,144 行**（另有 5 个生成的 CJK 字体文件） |
 | ④ | **物理算法与图表库（自研）** | radix-2 FFT、自相关测周期、向心 a-ω² 最小二乘；自研实时曲线控件 `pw_graph`/`pw_scope`（CPU 光栅 + `lv_image`） | **1,600 行** |
-| ⑤ | **性能工程** | 弃用 lv_chart，走通 **EPIC IMAGE 硬件 blit** 路径 → **真机 3 → 43 FPS（×14）**；同一优化使**模拟器**从"很卡" → **22–23 FPS** | 真机 +1333% |
+| ⑤ | **性能工程** | 弃用 lv_chart，走通 **EPIC IMAGE 硬件 blit** 路径 → **真机 3 → 41/43 FPS（×14）**；**第二次优化**（主循环自适应休眠）实时页再 **+30.8%**、刷新率顶到**面板 60 Hz 上限**，并实测否决 6 个假设；同一优化使**模拟器**从“很卡” → **22–23 FPS** | 真机 +1333%；二次优化见 `docs/evidence/p0-20260916/` |
 | ⑥ | **国际化（i18n/CJK）** | EN/ZH 双语言字符串表 **各 228 条（共 456 条）**；Montserrat + Droid 子集生成 **5 档 CJK 字体**（14/16/20/24/28px，本次 534 个 CJK 码点） | 表 + 5 字体（`tools/phywear/gen_fonts.sh` 可重生成） |
 | ⑦ | **工程化与验证** | 自建 **goldfish-phywear 模拟器板级配置**；bench 注入 + FPS/空闲堆统计；中文界面截图证据；git 标签回归 | 模拟器配置 + bench 工具 |
 | ⑧ | **AI 辅助开发** | Claude Code + Codex **43 个官方会话**（validate-log 通过）+ 自建 Skill `phywear-sf32lb52-devloop` | `logs/XPQHyue/`；DSH 补充 13 会话 |
