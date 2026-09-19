@@ -25,4 +25,4 @@
 传感器驱动（MMC5603/LTR-303/麦克风）、LVGL UI 屏管理与 EPIC blit 曲线渲染、CJK 字体管线、
 i18n EN/ZH、EPIC/LVGL 性能优化（3→43 FPS）、真机摆测 g、phyphox 源码分析、硬件 bring-up 调试等。
 
-> 本目录内容为**补充说明**，不参与 AI 官方评分；官方 AI 日志见 `/logs/XPQHyue/`。
+> 本目录内容为**仅补充佐证 AI**（开发过程与工作量）；官方 AI Coding 日志见 `/logs/XPQHyue/`。
